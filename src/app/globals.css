@@ -96,81 +96,6 @@ h4 {
   color: white;
 }
 
-/* =========================================
-   02. GLOBAL NAVBAR
-========================================= */
-
-.navbar {
-  position: relative;
-  z-index: 20;
-  min-height: 82px;
-  padding: 0 7%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 25px;
-  border-bottom: 1px solid #ffffff12;
-  background: var(--background);
-  color: var(--text);
-}
-
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 30px;
-  color: #c4bfd3;
-  font-size: 14px;
-}
-
-.nav-links a {
-  color: #c4bfd3;
-  white-space: nowrap;
-  transition: color 0.2s ease;
-}
-
-.nav-links a:hover,
-.nav-links a.nav-active {
-  color: var(--primary-light);
-}
-
-.nav-links a.nav-active {
-  font-weight: 700;
-}
-
-.nav-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.login-btn,
-.register-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 20px;
-  border-radius: 9px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: white;
-  white-space: nowrap;
-  transition: all 0.2s ease;
-}
-
-.login-btn:hover {
-  border-color: var(--primary);
-  color: var(--primary-light);
-}
-
-.register-btn {
-  background: var(--primary);
-  border-color: var(--primary);
-}
-
-.register-btn:hover {
-  background: #7c3aed;
-  color: white;
-}
 
 /* =========================================
    03. GLOBAL BUTTONS & TEXT
@@ -1470,19 +1395,7 @@ h4 {
 ========================================= */
 
 @media (max-width: 1100px) {
-  .navbar {
-    flex-wrap: wrap;
-    padding-top: 18px;
-    padding-bottom: 18px;
-  }
 
-  .nav-links {
-    order: 3;
-    width: 100%;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 20px;
-  }
 
   .hero {
     gap: 30px;
@@ -1524,32 +1437,6 @@ h4 {
 ========================================= */
 
 @media (max-width: 700px) {
-  .navbar {
-    padding: 20px 5%;
-    gap: 15px;
-  }
-
-
-  .nav-links {
-    order: 3;
-    width: 100%;
-    justify-content: flex-start;
-    flex-wrap: nowrap;
-    gap: 20px;
-    overflow-x: auto;
-    padding-bottom: 6px;
-    font-size: 13px;
-  }
-
-  .nav-actions {
-    gap: 7px;
-  }
-
-  .login-btn,
-  .register-btn {
-    padding: 8px 12px;
-    font-size: 13px;
-  }
 
   .hero {
     padding: 45px 5%;

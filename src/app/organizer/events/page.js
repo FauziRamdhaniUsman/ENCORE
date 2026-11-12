@@ -1,9 +1,11 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { concerts, formatPrice } from "../../../data/concerts";
+
+const inputClass =
+  "w-full rounded-lg border border-[#49345f] bg-[#130c20] p-[13px] text-[13px] text-white placeholder:text-[#897a9d] focus:outline-1 focus:outline-[#a766e8]";
 
 export default function OrganizerEventsPage() {
   const [orders, setOrders] = useState([]);
@@ -46,9 +48,7 @@ export default function OrganizerEventsPage() {
           : []
       );
 
-      setCustomEvents(
-        Array.isArray(savedEvents) ? savedEvents : []
-      );
+      setCustomEvents(Array.isArray(savedEvents) ? savedEvents : []);
     } catch (error) {
       console.error("Gagal membaca data:", error);
     }
@@ -89,10 +89,7 @@ export default function OrganizerEventsPage() {
       return;
     }
 
-    if (
-      Number(form.price) <= 0 ||
-      Number(form.capacity) <= 0
-    ) {
+    if (Number(form.price) <= 0 || Number(form.capacity) <= 0) {
       setMessage("Harga dan kapasitas harus lebih dari 0.");
       return;
     }
@@ -101,14 +98,11 @@ export default function OrganizerEventsPage() {
       id: `custom-${Date.now()}`,
       title: form.title.trim(),
       artist: form.artist.trim(),
-      date: new Date(form.date + "T00:00:00").toLocaleDateString(
-        "id-ID",
-        {
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-        }
-      ),
+      date: new Date(form.date + "T00:00:00").toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }),
       dateISO: form.date,
       location: form.location.trim(),
       venue: form.venue.trim(),
@@ -154,8 +148,7 @@ export default function OrganizerEventsPage() {
     );
 
     const ticketsSold = eventOrders.reduce(
-      (total, order) =>
-        total + Number(order.ticketQuantity || 0),
+      (total, order) => total + Number(order.ticketQuantity || 0),
       0
     );
 
@@ -172,59 +165,85 @@ export default function OrganizerEventsPage() {
   };
 
   const totalTickets = orders.reduce(
-    (total, order) =>
-      total + Number(order.ticketQuantity || 0),
+    (total, order) => total + Number(order.ticketQuantity || 0),
     0
   );
 
   const totalEvents = concerts.length + myEvents.length;
 
   return (
-    <main className="events-page">
-      <header className="page-header">
+    <main className="box-border min-h-screen bg-[#10091b] p-10 text-white max-[650px]:p-[22px]">
+      <header className="mb-[35px] flex items-center justify-between gap-5 max-[650px]:flex-col max-[650px]:items-start">
         <div>
-          <span className="eyebrow">ENCORE ORGANIZER</span>
-          <h1>Manajemen Event</h1>
-          <p>Kelola event dan pantau performa penjualan tiket.</p>
+          <span className="text-xs font-bold tracking-[2px] text-[#bd83ff]">
+            ENCORE ORGANIZER
+          </span>
+          <h1 className="my-3 font-heading text-[32px] font-bold">
+            Manajemen Event
+          </h1>
+          <p className="text-sm text-[#b9a9d0]">
+            Kelola event dan pantau performa penjualan tiket.
+          </p>
         </div>
 
-        <div className="header-actions">
-          <Link href="/organizer/dashboard" className="back-button">
+        <div className="flex flex-wrap gap-2.5">
+          <Link
+            href="/organizer/dashboard"
+            className="rounded-[9px] border border-[#49316d] bg-[#281b39] px-[18px] py-3 text-[13px] font-bold text-white"
+          >
             ← Dashboard
           </Link>
 
-          <Link href="/organizer/checkin" className="scan-button">
+          <Link
+            href="/organizer/checkin"
+            className="rounded-[9px] bg-[#a766e8] px-[18px] py-3 text-[13px] font-bold text-white"
+          >
             Scan Tiket →
           </Link>
         </div>
       </header>
 
-      <section className="event-summary">
-        <div className="summary-card">
-          <span>Total Event</span>
-          <strong>{totalEvents}</strong>
+      <section className="mb-[30px] grid grid-cols-3 gap-[18px] max-[650px]:grid-cols-1">
+        <div className="rounded-[15px] border border-[#39274b] bg-[#1c1229] p-6">
+          <span className="block text-[13px] text-[#b9a9d0]">Total Event</span>
+          <strong className="mt-3 block text-[29px] text-[#c58aff]">
+            {totalEvents}
+          </strong>
         </div>
 
-        <div className="summary-card">
-          <span>Total Tiket Terjual</span>
-          <strong>{totalTickets}</strong>
+        <div className="rounded-[15px] border border-[#39274b] bg-[#1c1229] p-6">
+          <span className="block text-[13px] text-[#b9a9d0]">
+            Total Tiket Terjual
+          </span>
+          <strong className="mt-3 block text-[29px] text-[#c58aff]">
+            {totalTickets}
+          </strong>
         </div>
 
-        <div className="summary-card">
-          <span>Total Transaksi</span>
-          <strong>{orders.length}</strong>
+        <div className="rounded-[15px] border border-[#39274b] bg-[#1c1229] p-6">
+          <span className="block text-[13px] text-[#b9a9d0]">
+            Total Transaksi
+          </span>
+          <strong className="mt-3 block text-[29px] text-[#c58aff]">
+            {orders.length}
+          </strong>
         </div>
       </section>
 
-      <section className="create-section">
-        <div className="create-heading">
+      <section className="mb-[38px] rounded-[15px] border border-[#39274b] bg-[#1c1229] p-[25px]">
+        <div className="flex items-center justify-between gap-5 max-[650px]:flex-col max-[650px]:items-start">
           <div>
-            <h2>Buat Event Baru</h2>
-            <p>Tambahkan konser yang akan kamu selenggarakan.</p>
+            <h2 className="m-0 mb-2 font-heading text-[22px] font-bold">
+              Buat Event Baru
+            </h2>
+            <p className="text-sm text-[#b9a9d0]">
+              Tambahkan konser yang akan kamu selenggarakan.
+            </p>
           </div>
 
           <button
-            className="create-button"
+            type="button"
+            className="cursor-pointer rounded-[9px] border-0 bg-[#a766e8] px-[19px] py-[13px] font-bold text-white"
             onClick={() => {
               setShowForm(!showForm);
               setMessage("");
@@ -235,53 +254,68 @@ export default function OrganizerEventsPage() {
         </div>
 
         {message && (
-          <div className="message">
+          <div className="mt-5 rounded-[9px] bg-[#183d30] p-[13px] text-[13px] text-[#65e5a4]">
             {message}
           </div>
         )}
 
         {showForm && (
-          <form className="event-form" onSubmit={handleCreateEvent}>
-            <div className="form-grid">
-              <div className="form-field">
-                <label>Nama Konser *</label>
+          <form
+            className="mt-[25px] border-t border-[#39274b] pt-[25px]"
+            onSubmit={handleCreateEvent}
+          >
+            <div className="mb-[18px] grid grid-cols-2 gap-[18px] max-[650px]:grid-cols-1">
+              <div className="mb-[17px] flex flex-col gap-[9px]">
+                <label className="text-[13px] font-bold text-[#d4aaff]">
+                  Nama Konser *
+                </label>
                 <input
                   name="title"
                   value={form.title}
                   onChange={updateForm}
                   placeholder="Contoh: ENCORE Music Festival"
                   required
+                  className={inputClass}
                 />
               </div>
 
-              <div className="form-field">
-                <label>Artis / Pengisi Acara *</label>
+              <div className="mb-[17px] flex flex-col gap-[9px]">
+                <label className="text-[13px] font-bold text-[#d4aaff]">
+                  Artis / Pengisi Acara *
+                </label>
                 <input
                   name="artist"
                   value={form.artist}
                   onChange={updateForm}
                   placeholder="Nama artis"
                   required
+                  className={inputClass}
                 />
               </div>
 
-              <div className="form-field">
-                <label>Tanggal Acara *</label>
+              <div className="mb-[17px] flex flex-col gap-[9px]">
+                <label className="text-[13px] font-bold text-[#d4aaff]">
+                  Tanggal Acara *
+                </label>
                 <input
                   type="date"
                   name="date"
                   value={form.date}
                   onChange={updateForm}
                   required
+                  className={inputClass}
                 />
               </div>
 
-              <div className="form-field">
-                <label>Kategori Event *</label>
+              <div className="mb-[17px] flex flex-col gap-[9px]">
+                <label className="text-[13px] font-bold text-[#d4aaff]">
+                  Kategori Event *
+                </label>
                 <select
                   name="category"
                   value={form.category}
                   onChange={updateForm}
+                  className={inputClass}
                 >
                   <option value="Konser">Konser</option>
                   <option value="Festival">Festival</option>
@@ -290,30 +324,38 @@ export default function OrganizerEventsPage() {
                 </select>
               </div>
 
-              <div className="form-field">
-                <label>Kota *</label>
+              <div className="mb-[17px] flex flex-col gap-[9px]">
+                <label className="text-[13px] font-bold text-[#d4aaff]">
+                  Kota *
+                </label>
                 <input
                   name="location"
                   value={form.location}
                   onChange={updateForm}
                   placeholder="Contoh: Jakarta"
                   required
+                  className={inputClass}
                 />
               </div>
 
-              <div className="form-field">
-                <label>Venue *</label>
+              <div className="mb-[17px] flex flex-col gap-[9px]">
+                <label className="text-[13px] font-bold text-[#d4aaff]">
+                  Venue *
+                </label>
                 <input
                   name="venue"
                   value={form.venue}
                   onChange={updateForm}
                   placeholder="Nama tempat acara"
                   required
+                  className={inputClass}
                 />
               </div>
 
-              <div className="form-field">
-                <label>Harga Tiket (Rp) *</label>
+              <div className="mb-[17px] flex flex-col gap-[9px]">
+                <label className="text-[13px] font-bold text-[#d4aaff]">
+                  Harga Tiket (Rp) *
+                </label>
                 <input
                   type="number"
                   name="price"
@@ -322,11 +364,14 @@ export default function OrganizerEventsPage() {
                   placeholder="Contoh: 250000"
                   min="1"
                   required
+                  className={inputClass}
                 />
               </div>
 
-              <div className="form-field">
-                <label>Kapasitas Tiket *</label>
+              <div className="mb-[17px] flex flex-col gap-[9px]">
+                <label className="text-[13px] font-bold text-[#d4aaff]">
+                  Kapasitas Tiket *
+                </label>
                 <input
                   type="number"
                   name="capacity"
@@ -335,89 +380,133 @@ export default function OrganizerEventsPage() {
                   placeholder="Contoh: 1000"
                   min="1"
                   required
+                  className={inputClass}
                 />
               </div>
             </div>
 
-            <div className="form-field">
-              <label>Deskripsi Event</label>
+            <div className="mb-[17px] flex flex-col gap-[9px]">
+              <label className="text-[13px] font-bold text-[#d4aaff]">
+                Deskripsi Event
+              </label>
               <textarea
                 name="description"
                 value={form.description}
                 onChange={updateForm}
                 placeholder="Ceritakan informasi tentang event..."
                 rows="4"
+                className={inputClass}
               />
             </div>
 
-            <button type="submit" className="submit-button">
+            <button
+              type="submit"
+              className="mt-[5px] cursor-pointer rounded-[9px] border-0 bg-[#a766e8] px-[19px] py-[13px] font-bold text-white"
+            >
               Simpan Event
             </button>
           </form>
         )}
       </section>
 
-      <section className="event-section">
-        <div className="section-heading">
+      <section className="mb-10">
+        <div className="mb-[22px] flex items-center justify-between gap-5 max-[650px]:flex-col max-[650px]:items-start">
           <div>
-            <h2>Event Saya</h2>
-            <p>Event yang dibuat oleh akun Organizer ini.</p>
+            <h2 className="m-0 mb-2 font-heading text-[22px] font-bold">
+              Event Saya
+            </h2>
+            <p className="text-sm text-[#b9a9d0]">
+              Event yang dibuat oleh akun Organizer ini.
+            </p>
           </div>
 
-          <span className="event-count">
+          <span className="rounded-[20px] bg-[#291a3b] px-3.5 py-2 text-xs whitespace-nowrap text-[#d4aaff]">
             {myEvents.length} Event
           </span>
         </div>
 
         {myEvents.length === 0 ? (
-          <div className="empty">
+          <div className="rounded-xl border border-[#39274b] bg-[#1c1229] p-[35px] text-center text-[#b9a9d0]">
             Belum ada event yang kamu buat. Klik Tambah Event untuk memulai.
           </div>
         ) : (
-          <div className="event-grid">
+          <div className="grid grid-cols-2 gap-[22px] max-[850px]:grid-cols-1">
             {myEvents.map((event) => {
               const stats = getEventStats(event);
 
               return (
-                <article className="event-card" key={event.id}>
-                  <div className="custom-event-banner">
-                    <span>{event.category}</span>
-                    <strong>{event.title}</strong>
+                <article
+                  className="overflow-hidden rounded-[15px] border border-[#39274b] bg-[#1c1229]"
+                  key={event.id}
+                >
+                  <div className="flex min-h-[190px] flex-col justify-end gap-3 bg-[linear-gradient(135deg,#51316e,#1c1229)] p-[25px]">
+                    <span className="text-xs text-[#e3c8ff]">
+                      {event.category}
+                    </span>
+                    <strong className="text-[25px] [overflow-wrap:anywhere]">
+                      {event.title}
+                    </strong>
                   </div>
 
-                  <div className="event-information">
-                    <p className="artist">{event.artist}</p>
+                  <div className="p-[22px]">
+                    <p className="mt-2 mb-[18px] text-[13px] text-[#bd83ff]">
+                      {event.artist}
+                    </p>
 
-                    <div className="event-details">
-                      <p>📅 {event.date}</p>
-                      <p>📍 {event.venue}, {event.location}</p>
-                      <p>🎟️ Kapasitas: {event.capacity} tiket</p>
-                      <p>🏢 {event.organizer}</p>
+                    <div className="flex flex-col gap-2.5 border-y border-[#39274b] py-[15px]">
+                      <p className="m-0 text-xs text-[#c9bed8]">
+                        📅 {event.date}
+                      </p>
+                      <p className="m-0 text-xs text-[#c9bed8]">
+                        📍 {event.venue}, {event.location}
+                      </p>
+                      <p className="m-0 text-xs text-[#c9bed8]">
+                        🎟️ Kapasitas: {event.capacity} tiket
+                      </p>
+                      <p className="m-0 text-xs text-[#c9bed8]">
+                        🏢 {event.organizer}
+                      </p>
                     </div>
 
-                    <div className="event-price">
+                    <div className="mt-[18px] flex flex-col gap-[7px] text-[11px] text-[#b9a9d0]">
                       Harga tiket mulai dari
-                      <strong>{formatPrice(event.price)}</strong>
+                      <strong className="text-[17px] text-[#d4aaff]">
+                        {formatPrice(event.price)}
+                      </strong>
                     </div>
 
-                    <div className="sales-information">
-                      <div>
-                        <span>Pesanan</span>
-                        <strong>{stats.orders}</strong>
+                    <div className="mt-5 grid grid-cols-3 gap-2.5 rounded-[10px] bg-[#130c20] px-2.5 py-[15px]">
+                      <div className="flex min-w-0 flex-col gap-2">
+                        <span className="text-[10px] text-[#b9a9d0]">
+                          Pesanan
+                        </span>
+                        <strong className="text-[13px] [overflow-wrap:anywhere] text-[#c58aff]">
+                          {stats.orders}
+                        </strong>
                       </div>
 
-                      <div>
-                        <span>Tiket Terjual</span>
-                        <strong>{stats.ticketsSold}</strong>
+                      <div className="flex min-w-0 flex-col gap-2">
+                        <span className="text-[10px] text-[#b9a9d0]">
+                          Tiket Terjual
+                        </span>
+                        <strong className="text-[13px] [overflow-wrap:anywhere] text-[#c58aff]">
+                          {stats.ticketsSold}
+                        </strong>
                       </div>
 
-                      <div>
-                        <span>Pendapatan</span>
-                        <strong>{formatPrice(stats.revenue)}</strong>
+                      <div className="flex min-w-0 flex-col gap-2">
+                        <span className="text-[10px] text-[#b9a9d0]">
+                          Pendapatan
+                        </span>
+                        <strong className="text-[13px] [overflow-wrap:anywhere] text-[#c58aff]">
+                          {formatPrice(stats.revenue)}
+                        </strong>
                       </div>
                     </div>
 
-                    <span className="event-status">Event Aktif</span>
+                    <span className="mt-[18px] inline-block rounded-[20px] bg-[#183d30] px-3 py-[7px] text-[11px] text-[#65e5a4]">
+                      Event Aktif
+                    </span>
                   </div>
                 </article>
               );
@@ -426,67 +515,104 @@ export default function OrganizerEventsPage() {
         )}
       </section>
 
-      <section className="event-section">
-        <div className="section-heading">
+      <section className="mb-10">
+        <div className="mb-[22px] flex items-center justify-between gap-5 max-[650px]:flex-col max-[650px]:items-start">
           <div>
-            <h2>Katalog Event ENCORE</h2>
-            <p>Daftar event bawaan yang tersedia di platform.</p>
+            <h2 className="m-0 mb-2 font-heading text-[22px] font-bold">
+              Katalog Event ENCORE
+            </h2>
+            <p className="text-sm text-[#b9a9d0]">
+              Daftar event bawaan yang tersedia di platform.
+            </p>
           </div>
 
-          <span className="event-count">
+          <span className="rounded-[20px] bg-[#291a3b] px-3.5 py-2 text-xs whitespace-nowrap text-[#d4aaff]">
             {concerts.length} Event
           </span>
         </div>
 
-        <div className="event-grid">
+        <div className="grid grid-cols-2 gap-[22px] max-[850px]:grid-cols-1">
           {concerts.map((concert) => {
             const stats = getEventStats(concert);
 
             return (
-              <article className="event-card" key={concert.id}>
-                <div className="event-image">
-                  <img src={concert.image} alt={concert.title} />
+              <article
+                className="overflow-hidden rounded-[15px] border border-[#39274b] bg-[#1c1229]"
+                key={concert.id}
+              >
+                <div className="relative h-[190px] bg-[#251832]">
+                  <img
+                    src={concert.image}
+                    alt={concert.title}
+                    className="size-full object-cover"
+                  />
 
-                  <span className="event-category">
+                  <span className="absolute top-3.5 left-3.5 rounded-[20px] bg-[#10091be8] px-3 py-[7px] text-[11px] text-[#d4aaff]">
                     {concert.category || "Konser"}
                   </span>
                 </div>
 
-                <div className="event-information">
-                  <h3>{concert.title}</h3>
-                  <p className="artist">{concert.artist}</p>
+                <div className="p-[22px]">
+                  <h3 className="m-0 font-heading text-[19px]">
+                    {concert.title}
+                  </h3>
+                  <p className="mt-2 mb-[18px] text-[13px] text-[#bd83ff]">
+                    {concert.artist}
+                  </p>
 
-                  <div className="event-details">
-                    <p>📅 {concert.date}</p>
-                    <p>📍 {concert.venue || concert.location}</p>
-                    <p>🏢 {concert.organizer || "Penyelenggara belum dicantumkan"}</p>
+                  <div className="flex flex-col gap-2.5 border-y border-[#39274b] py-[15px]">
+                    <p className="m-0 text-xs text-[#c9bed8]">
+                      📅 {concert.date}
+                    </p>
+                    <p className="m-0 text-xs text-[#c9bed8]">
+                      📍 {concert.venue || concert.location}
+                    </p>
+                    <p className="m-0 text-xs text-[#c9bed8]">
+                      🏢{" "}
+                      {concert.organizer ||
+                        "Penyelenggara belum dicantumkan"}
+                    </p>
                   </div>
 
-                  <div className="event-price">
+                  <div className="mt-[18px] flex flex-col gap-[7px] text-[11px] text-[#b9a9d0]">
                     Harga tiket mulai dari
-                    <strong>{formatPrice(concert.price)}</strong>
+                    <strong className="text-[17px] text-[#d4aaff]">
+                      {formatPrice(concert.price)}
+                    </strong>
                   </div>
 
-                  <div className="sales-information">
-                    <div>
-                      <span>Pesanan</span>
-                      <strong>{stats.orders}</strong>
+                  <div className="mt-5 grid grid-cols-3 gap-2.5 rounded-[10px] bg-[#130c20] px-2.5 py-[15px]">
+                    <div className="flex min-w-0 flex-col gap-2">
+                      <span className="text-[10px] text-[#b9a9d0]">
+                        Pesanan
+                      </span>
+                      <strong className="text-[13px] [overflow-wrap:anywhere] text-[#c58aff]">
+                        {stats.orders}
+                      </strong>
                     </div>
 
-                    <div>
-                      <span>Tiket Terjual</span>
-                      <strong>{stats.ticketsSold}</strong>
+                    <div className="flex min-w-0 flex-col gap-2">
+                      <span className="text-[10px] text-[#b9a9d0]">
+                        Tiket Terjual
+                      </span>
+                      <strong className="text-[13px] [overflow-wrap:anywhere] text-[#c58aff]">
+                        {stats.ticketsSold}
+                      </strong>
                     </div>
 
-                    <div>
-                      <span>Pendapatan</span>
-                      <strong>{formatPrice(stats.revenue)}</strong>
+                    <div className="flex min-w-0 flex-col gap-2">
+                      <span className="text-[10px] text-[#b9a9d0]">
+                        Pendapatan
+                      </span>
+                      <strong className="text-[13px] [overflow-wrap:anywhere] text-[#c58aff]">
+                        {formatPrice(stats.revenue)}
+                      </strong>
                     </div>
                   </div>
 
                   <Link
                     href={`/concerts/${concert.id}`}
-                    className="detail-button"
+                    className="mt-[18px] block rounded-[9px] border border-[#7544a6] p-[13px] text-center text-xs font-bold text-[#d4aaff] transition hover:bg-[#7544a6] hover:text-white"
                   >
                     Lihat Detail Event →
                   </Link>
@@ -496,399 +622,6 @@ export default function OrganizerEventsPage() {
           })}
         </div>
       </section>
-
-      <style>{`
-        * {
-          box-sizing: border-box;
-        }
-
-        .events-page {
-          min-height: 100vh;
-          padding: 40px;
-          background: #10091b;
-          color: #fff;
-          font-family: Arial, sans-serif;
-        }
-
-        .page-header,
-        .create-heading,
-        .section-heading {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 20px;
-        }
-
-        .page-header {
-          margin-bottom: 35px;
-        }
-
-        .eyebrow {
-          color: #bd83ff;
-          font-size: 12px;
-          font-weight: bold;
-          letter-spacing: 2px;
-        }
-
-        .page-header h1 {
-          margin: 12px 0;
-          font-size: 32px;
-        }
-
-        .page-header p,
-        .section-heading p,
-        .create-heading p {
-          color: #b9a9d0;
-          font-size: 14px;
-        }
-
-        .header-actions {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
-
-        .back-button,
-        .scan-button {
-          padding: 12px 18px;
-          border-radius: 9px;
-          color: white;
-          text-decoration: none;
-          font-size: 13px;
-          font-weight: bold;
-        }
-
-        .back-button {
-          background: #281b39;
-          border: 1px solid #49316d;
-        }
-
-        .scan-button,
-        .create-button,
-        .submit-button {
-          background: #a766e8;
-          color: white;
-        }
-
-        .scan-button {
-          text-decoration: none;
-          padding: 12px 18px;
-          border-radius: 9px;
-        }
-
-        .event-summary {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 18px;
-          margin-bottom: 30px;
-        }
-
-        .summary-card,
-        .create-section,
-        .event-card {
-          background: #1c1229;
-          border: 1px solid #39274b;
-          border-radius: 15px;
-        }
-
-        .summary-card {
-          padding: 24px;
-        }
-
-        .summary-card span {
-          display: block;
-          color: #b9a9d0;
-          font-size: 13px;
-        }
-
-        .summary-card strong {
-          display: block;
-          margin-top: 12px;
-          color: #c58aff;
-          font-size: 29px;
-        }
-
-        .create-section {
-          padding: 25px;
-          margin-bottom: 38px;
-        }
-
-        .create-heading h2,
-        .section-heading h2 {
-          margin: 0 0 8px;
-          font-size: 22px;
-        }
-
-        .create-button,
-        .submit-button {
-          border: 0;
-          padding: 13px 19px;
-          border-radius: 9px;
-          font-weight: bold;
-          cursor: pointer;
-        }
-
-        .message {
-          padding: 13px;
-          margin-top: 20px;
-          border-radius: 9px;
-          background: #183d30;
-          color: #65e5a4;
-          font-size: 13px;
-        }
-
-        .event-form {
-          margin-top: 25px;
-          padding-top: 25px;
-          border-top: 1px solid #39274b;
-        }
-
-        .form-grid {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 18px;
-          margin-bottom: 18px;
-        }
-
-        .form-field {
-          display: flex;
-          flex-direction: column;
-          gap: 9px;
-          margin-bottom: 17px;
-        }
-
-        .form-field label {
-          color: #d4aaff;
-          font-size: 13px;
-          font-weight: bold;
-        }
-
-        .form-field input,
-        .form-field select,
-        .form-field textarea {
-          width: 100%;
-          padding: 13px;
-          border: 1px solid #49345f;
-          border-radius: 8px;
-          background: #130c20;
-          color: white;
-          font: inherit;
-          font-size: 13px;
-        }
-
-        .form-field input:focus,
-        .form-field select:focus,
-        .form-field textarea:focus {
-          outline: 1px solid #a766e8;
-        }
-
-        .form-field input::placeholder,
-        .form-field textarea::placeholder {
-          color: #897a9d;
-        }
-
-        .submit-button {
-          margin-top: 5px;
-        }
-
-        .event-section {
-          margin-bottom: 40px;
-        }
-
-        .section-heading {
-          margin-bottom: 22px;
-        }
-
-        .event-count {
-          padding: 8px 14px;
-          border-radius: 20px;
-          background: #291a3b;
-          color: #d4aaff;
-          font-size: 12px;
-          white-space: nowrap;
-        }
-
-        .event-grid {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 22px;
-        }
-
-        .event-card {
-          overflow: hidden;
-        }
-
-        .event-image {
-          position: relative;
-          height: 190px;
-          background: #251832;
-        }
-
-        .event-image img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .event-category {
-          position: absolute;
-          top: 14px;
-          left: 14px;
-          padding: 7px 12px;
-          border-radius: 20px;
-          background: #10091be8;
-          color: #d4aaff;
-          font-size: 11px;
-        }
-
-        .custom-event-banner {
-          min-height: 190px;
-          padding: 25px;
-          display: flex;
-          flex-direction: column;
-          justify-content: flex-end;
-          gap: 12px;
-          background: linear-gradient(135deg, #51316e, #1c1229);
-        }
-
-        .custom-event-banner span {
-          color: #e3c8ff;
-          font-size: 12px;
-        }
-
-        .custom-event-banner strong {
-          font-size: 25px;
-          overflow-wrap: anywhere;
-        }
-
-        .event-information {
-          padding: 22px;
-        }
-
-        .event-information h3 {
-          margin: 0;
-          font-size: 19px;
-        }
-
-        .artist {
-          margin: 8px 0 18px;
-          color: #bd83ff;
-          font-size: 13px;
-        }
-
-        .event-details {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          padding: 15px 0;
-          border-top: 1px solid #39274b;
-          border-bottom: 1px solid #39274b;
-        }
-
-        .event-details p {
-          margin: 0;
-          color: #c9bed8;
-          font-size: 12px;
-        }
-
-        .event-price {
-          display: flex;
-          flex-direction: column;
-          gap: 7px;
-          margin-top: 18px;
-          color: #b9a9d0;
-          font-size: 11px;
-        }
-
-        .event-price strong {
-          color: #d4aaff;
-          font-size: 17px;
-        }
-
-        .sales-information {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 10px;
-          margin-top: 20px;
-          padding: 15px 10px;
-          border-radius: 10px;
-          background: #130c20;
-        }
-
-        .sales-information div {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          min-width: 0;
-        }
-
-        .sales-information span {
-          color: #b9a9d0;
-          font-size: 10px;
-        }
-
-        .sales-information strong {
-          color: #c58aff;
-          font-size: 13px;
-          overflow-wrap: anywhere;
-        }
-
-        .event-status {
-          display: inline-block;
-          margin-top: 18px;
-          padding: 7px 12px;
-          border-radius: 20px;
-          background: #183d30;
-          color: #65e5a4;
-          font-size: 11px;
-        }
-
-        .detail-button {
-          display: block;
-          margin-top: 18px;
-          padding: 13px;
-          border: 1px solid #7544a6;
-          border-radius: 9px;
-          color: #d4aaff;
-          text-align: center;
-          text-decoration: none;
-          font-size: 12px;
-          font-weight: bold;
-        }
-
-        .empty {
-          padding: 35px;
-          text-align: center;
-          color: #b9a9d0;
-          background: #1c1229;
-          border: 1px solid #39274b;
-          border-radius: 12px;
-        }
-
-        @media (max-width: 850px) {
-          .event-grid {
-            grid-template-columns: 1fr;
-          }
-        }
-
-        @media (max-width: 650px) {
-          .events-page {
-            padding: 22px;
-          }
-
-          .page-header,
-          .create-heading,
-          .section-heading {
-            align-items: flex-start;
-            flex-direction: column;
-          }
-
-          .event-summary,
-          .form-grid {
-            grid-template-columns: 1fr;
-          }
-        }
-      `}</style>
     </main>
   );
 }

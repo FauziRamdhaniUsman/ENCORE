@@ -23,17 +23,12 @@ export default function OrganizerDashboard() {
       }
 
       const currentOrganizerId = String(user.id);
-      const currentOrganizerEmail = String(
-        user.email || ""
-      ).toLowerCase();
-
+      const currentOrganizerEmail = String(user.email || "").toLowerCase();
       const currentOrganizerName = String(
         user.organization || user.name || ""
       ).toLowerCase();
 
-      setOrganizerName(
-        user.organization || user.name || "Organizer"
-      );
+      setOrganizerName(user.organization || user.name || "Organizer");
 
       const savedOrders = JSON.parse(
         localStorage.getItem("encoreOrders") || "[]"
@@ -47,9 +42,7 @@ export default function OrganizerDashboard() {
         ? savedEvents
             .filter((event) => {
               const eventOrganizerId =
-                event.organizerId ??
-                event.createdBy ??
-                event.userId;
+                event.organizerId ?? event.createdBy ?? event.userId;
 
               return (
                 eventOrganizerId != null &&
@@ -63,9 +56,7 @@ export default function OrganizerDashboard() {
         ? savedEvents
             .filter((event) => {
               const eventOrganizerId =
-                event.organizerId ??
-                event.createdBy ??
-                event.userId;
+                event.organizerId ?? event.createdBy ?? event.userId;
 
               return (
                 eventOrganizerId != null &&
@@ -84,9 +75,7 @@ export default function OrganizerDashboard() {
             }
 
             const orderOrganizerId =
-              order.organizerId ??
-              order.createdBy ??
-              order.userIdOrganizer;
+              order.organizerId ?? order.createdBy ?? order.userIdOrganizer;
 
             const orderOrganizerEmail = String(
               order.organizerEmail || ""
@@ -99,8 +88,7 @@ export default function OrganizerDashboard() {
                   order.organizer?.organization ||
                   "";
 
-            const orderOrganizerName =
-              String(organizerValue).toLowerCase();
+            const orderOrganizerName = String(organizerValue).toLowerCase();
 
             const orderEventId = String(
               order.concertId ?? order.eventId ?? ""
@@ -110,34 +98,22 @@ export default function OrganizerDashboard() {
               order.concertTitle || order.eventName || ""
             ).toLowerCase();
 
-            // Prioritaskan pencocokan berdasarkan ID Organizer.
             if (orderOrganizerId != null) {
-              return (
-                String(orderOrganizerId) === currentOrganizerId
-              );
+              return String(orderOrganizerId) === currentOrganizerId;
             }
 
-            // Jika ID Organizer tidak tersedia,
-            // cocokkan dengan email Organizer.
             if (orderOrganizerEmail) {
-              return (
-                orderOrganizerEmail === currentOrganizerEmail
-              );
+              return orderOrganizerEmail === currentOrganizerEmail;
             }
 
-            // Gunakan nama event milik Organizer sebagai cadangan.
             if (orderEventId && myEventIds.includes(orderEventId)) {
               return true;
             }
 
-            if (
-              orderEventName &&
-              myEventNames.includes(orderEventName)
-            ) {
+            if (orderEventName && myEventNames.includes(orderEventName)) {
               return true;
             }
 
-            // Cadangan untuk transaksi lama yang menyimpan nama Organizer.
             if (orderOrganizerName && currentOrganizerName) {
               return orderOrganizerName === currentOrganizerName;
             }
@@ -157,10 +133,7 @@ export default function OrganizerDashboard() {
 
   const getQuantity = (order) =>
     Number(
-      order.ticketQuantity ??
-      order.quantity ??
-      order.totalPersons ??
-      1
+      order.ticketQuantity ?? order.quantity ?? order.totalPersons ?? 1
     );
 
   const totalTickets = orders.reduce(
@@ -176,16 +149,11 @@ export default function OrganizerDashboard() {
   const checkedInTickets = orders.reduce(
     (total, order) =>
       total +
-      (order.checkInStatus === "checked_in"
-        ? getQuantity(order)
-        : 0),
+      (order.checkInStatus === "checked_in" ? getQuantity(order) : 0),
     0
   );
 
-  const pendingCheckIn = Math.max(
-    0,
-    totalTickets - checkedInTickets
-  );
+  const pendingCheckIn = Math.max(0, totalTickets - checkedInTickets);
 
   const formatPrice = (price) =>
     new Intl.NumberFormat("id-ID", {
@@ -197,9 +165,7 @@ export default function OrganizerDashboard() {
   const eventReports = Object.values(
     orders.reduce((groups, order) => {
       const eventName =
-        order.concertTitle ||
-        order.eventName ||
-        "Event Tanpa Nama";
+        order.concertTitle || order.eventName || "Event Tanpa Nama";
 
       if (!groups[eventName]) {
         groups[eventName] = {
@@ -227,117 +193,154 @@ export default function OrganizerDashboard() {
 
   if (loading) {
     return (
-      <div className="loading">
+      <div className="grid min-h-screen place-items-center bg-[#10091b] text-white">
         Memuat Dashboard ENCORE...
-        <style>{`
-          .loading {
-            min-height: 100vh;
-            display: grid;
-            place-items: center;
-            background: #10091b;
-            color: white;
-            font-family: Arial, sans-serif;
-          }
-        `}</style>
       </div>
     );
   }
 
   return (
-    <main className="dashboard">
-      <header className="header">
+    <main className="box-border min-h-screen bg-[#10091b] p-10 text-white max-[700px]:p-[22px]">
+      <header className="mb-[35px] flex items-center justify-between gap-5 max-[700px]:flex-col max-[700px]:items-start">
         <div>
-          <p className="eyebrow">ENCORE ORGANIZER</p>
-          <h1>Dashboard</h1>
-          <p>Selamat datang, {organizerName}!</p>
+          <p className="text-xs font-bold tracking-[2px] text-[#bd83ff]">
+            ENCORE ORGANIZER
+          </p>
+          <h1 className="my-2.5 font-heading text-[32px] font-bold">
+            Dashboard
+          </h1>
+          <p className="text-[#b9a9d0]">Selamat datang, {organizerName}!</p>
         </div>
 
-        <div className="header-actions">
+        <div className="flex flex-wrap gap-3 max-[700px]:w-full">
           <Link
             href="/organizer/events"
-            className="event-button"
+            className="inline-block rounded-[10px] border border-[#49316d] bg-[#281b39] px-5 py-[13px] text-[13px] font-bold text-white"
           >
             Manajemen Event
           </Link>
 
           <Link
+            href="/organizer/staff"
+            className="inline-block rounded-[10px] border border-[#49316d] bg-[#281b39] px-5 py-[13px] text-[13px] font-bold text-white"
+          >
+            Manajemen Petugas
+          </Link>
+
+          <Link
             href="/organizer/checkin"
-            className="checkin"
+            className="inline-block rounded-[10px] bg-[#a766e8] px-5 py-[13px] text-[13px] font-bold text-white"
           >
             Scan Tiket →
           </Link>
         </div>
       </header>
 
-      <section className="stats">
-        <div className="stat-card">
-          <span>Total Pesanan</span>
-          <h2>{orders.length}</h2>
+      <section className="mb-[35px] grid grid-cols-3 gap-5 max-[900px]:grid-cols-2 max-[700px]:grid-cols-1">
+        <div className="rounded-[15px] border border-[#39274b] bg-[#1c1229] p-[25px]">
+          <span className="text-[13px] text-[#b9a9d0]">Total Pesanan</span>
+          <h2 className="mt-[15px] mb-0 font-heading text-[27px] text-[#c58aff]">
+            {orders.length}
+          </h2>
         </div>
 
-        <div className="stat-card">
-          <span>Total Tiket Terjual</span>
-          <h2>{totalTickets}</h2>
+        <div className="rounded-[15px] border border-[#39274b] bg-[#1c1229] p-[25px]">
+          <span className="text-[13px] text-[#b9a9d0]">
+            Total Tiket Terjual
+          </span>
+          <h2 className="mt-[15px] mb-0 font-heading text-[27px] text-[#c58aff]">
+            {totalTickets}
+          </h2>
         </div>
 
-        <div className="stat-card">
-          <span>Total Pendapatan</span>
-          <h2>{formatPrice(totalRevenue)}</h2>
+        <div className="rounded-[15px] border border-[#39274b] bg-[#1c1229] p-[25px]">
+          <span className="text-[13px] text-[#b9a9d0]">Total Pendapatan</span>
+          <h2 className="mt-[15px] mb-0 font-heading text-[27px] text-[#c58aff]">
+            {formatPrice(totalRevenue)}
+          </h2>
         </div>
 
-        <div className="stat-card">
-          <span>Tiket Sudah Check-in</span>
-          <h2>{checkedInTickets}</h2>
+        <div className="rounded-[15px] border border-[#39274b] bg-[#1c1229] p-[25px]">
+          <span className="text-[13px] text-[#b9a9d0]">
+            Tiket Sudah Check-in
+          </span>
+          <h2 className="mt-[15px] mb-0 font-heading text-[27px] text-[#c58aff]">
+            {checkedInTickets}
+          </h2>
         </div>
 
-        <div className="stat-card">
-          <span>Belum Check-in</span>
-          <h2>{pendingCheckIn}</h2>
+        <div className="rounded-[15px] border border-[#39274b] bg-[#1c1229] p-[25px]">
+          <span className="text-[13px] text-[#b9a9d0]">Belum Check-in</span>
+          <h2 className="mt-[15px] mb-0 font-heading text-[27px] text-[#c58aff]">
+            {pendingCheckIn}
+          </h2>
         </div>
       </section>
 
-      <section className="content">
-        <div className="section-heading">
+      <section className="mb-[25px] rounded-[15px] border border-[#39274b] bg-[#1c1229] p-[25px]">
+        <div className="mb-5">
           <div>
-            <h2>Laporan Penjualan per Event</h2>
-            <p>
+            <h2 className="mt-0 font-heading text-xl font-bold">
+              Laporan Penjualan per Event
+            </h2>
+            <p className="mb-[25px] text-[#b9a9d0]">
               Ringkasan performa penjualan event milikmu.
             </p>
           </div>
         </div>
 
         {eventReports.length === 0 ? (
-          <div className="empty">
+          <div className="rounded-[10px] bg-[#160e21] p-[35px] text-center text-[#b9a9d0]">
             Belum ada data penjualan event milikmu.
           </div>
         ) : (
-          <div className="table-wrapper">
-            <table>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[800px] border-collapse">
               <thead>
                 <tr>
-                  <th>Nama Event</th>
-                  <th>Pesanan</th>
-                  <th>Tiket Terjual</th>
-                  <th>Pendapatan</th>
-                  <th>Sudah Check-in</th>
-                  <th>Belum Check-in</th>
+                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
+                    Nama Event
+                  </th>
+                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
+                    Pesanan
+                  </th>
+                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
+                    Tiket Terjual
+                  </th>
+                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
+                    Pendapatan
+                  </th>
+                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
+                    Sudah Check-in
+                  </th>
+                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
+                    Belum Check-in
+                  </th>
                 </tr>
               </thead>
 
               <tbody>
                 {eventReports.map((event, index) => (
                   <tr key={`${event.name}-${index}`}>
-                    <td>{event.name}</td>
-                    <td>{event.orders}</td>
-                    <td>{event.tickets}</td>
-                    <td>{formatPrice(event.revenue)}</td>
-                    <td>
-                      <span className="checked-status">
+                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
+                      {event.name}
+                    </td>
+                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
+                      {event.orders}
+                    </td>
+                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
+                      {event.tickets}
+                    </td>
+                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
+                      {formatPrice(event.revenue)}
+                    </td>
+                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
+                      <span className="rounded-[20px] bg-[#183d30] px-2.5 py-1.5 text-[11px] whitespace-nowrap text-[#65e5a4]">
                         {event.checkedIn}
                       </span>
                     </td>
-                    <td>
-                      <span className="pending-status">
+                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
+                      <span className="rounded-[20px] bg-[#49351d] px-2.5 py-1.5 text-[11px] whitespace-nowrap text-[#ffc76a]">
                         {event.tickets - event.checkedIn}
                       </span>
                     </td>
@@ -349,27 +352,41 @@ export default function OrganizerDashboard() {
         )}
       </section>
 
-      <section className="content">
-        <h2>Riwayat Penjualan</h2>
-        <p>
+      <section className="mb-[25px] rounded-[15px] border border-[#39274b] bg-[#1c1229] p-[25px]">
+        <h2 className="mt-0 font-heading text-xl font-bold">
+          Riwayat Penjualan
+        </h2>
+        <p className="mb-[25px] text-[#b9a9d0]">
           Daftar transaksi tiket event milikmu yang berhasil dibayar.
         </p>
 
         {orders.length === 0 ? (
-          <div className="empty">
+          <div className="rounded-[10px] bg-[#160e21] p-[35px] text-center text-[#b9a9d0]">
             Belum ada transaksi yang berhasil.
           </div>
         ) : (
-          <div className="table-wrapper">
-            <table>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[800px] border-collapse">
               <thead>
                 <tr>
-                  <th>Pemesan</th>
-                  <th>Email</th>
-                  <th>Konser</th>
-                  <th>Jumlah Tiket</th>
-                  <th>Total Pembayaran</th>
-                  <th>Status Check-in</th>
+                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
+                    Pemesan
+                  </th>
+                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
+                    Email
+                  </th>
+                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
+                    Konser
+                  </th>
+                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
+                    Jumlah Tiket
+                  </th>
+                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
+                    Total Pembayaran
+                  </th>
+                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
+                    Status Check-in
+                  </th>
                 </tr>
               </thead>
 
@@ -380,24 +397,28 @@ export default function OrganizerDashboard() {
                       order.id || order.ticketCode || "order"
                     }-${index}`}
                   >
-                    <td>{order.buyerName || "-"}</td>
-                    <td>{order.buyerEmail || "-"}</td>
-                    <td>
-                      {order.concertTitle ||
-                        order.eventName ||
-                        "-"}
+                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
+                      {order.buyerName || "-"}
                     </td>
-                    <td>{getQuantity(order)}</td>
-                    <td>
+                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
+                      {order.buyerEmail || "-"}
+                    </td>
+                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
+                      {order.concertTitle || order.eventName || "-"}
+                    </td>
+                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
+                      {getQuantity(order)}
+                    </td>
+                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
                       {formatPrice(Number(order.total || 0))}
                     </td>
-                    <td>
+                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
                       {order.checkInStatus === "checked_in" ? (
-                        <span className="checked-status">
+                        <span className="rounded-[20px] bg-[#183d30] px-2.5 py-1.5 text-[11px] whitespace-nowrap text-[#65e5a4]">
                           Sudah Check-in
                         </span>
                       ) : (
-                        <span className="pending-status">
+                        <span className="rounded-[20px] bg-[#49351d] px-2.5 py-1.5 text-[11px] whitespace-nowrap text-[#ffc76a]">
                           Belum Check-in
                         </span>
                       )}
@@ -409,193 +430,6 @@ export default function OrganizerDashboard() {
           </div>
         )}
       </section>
-
-      <style>{`
-        * {
-          box-sizing: border-box;
-        }
-
-        .dashboard {
-          min-height: 100vh;
-          padding: 40px;
-          background: #10091b;
-          color: #fff;
-          font-family: Arial, sans-serif;
-        }
-
-        .header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 20px;
-          margin-bottom: 35px;
-        }
-
-        .eyebrow {
-          color: #bd83ff;
-          font-size: 12px;
-          letter-spacing: 2px;
-          font-weight: bold;
-        }
-
-        .header h1 {
-          font-size: 32px;
-          margin: 10px 0;
-        }
-
-        .header p {
-          color: #b9a9d0;
-        }
-
-        .header-actions {
-          display: flex;
-          gap: 12px;
-          flex-wrap: wrap;
-        }
-
-        .checkin,
-        .event-button {
-          display: inline-block;
-          color: white;
-          text-decoration: none;
-          padding: 13px 20px;
-          border-radius: 10px;
-          font-weight: bold;
-          font-size: 13px;
-        }
-
-        .checkin {
-          background: #a766e8;
-        }
-
-        .event-button {
-          background: #281b39;
-          border: 1px solid #49316d;
-        }
-
-        .stats {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 20px;
-          margin-bottom: 35px;
-        }
-
-        .stat-card,
-        .content {
-          background: #1c1229;
-          border: 1px solid #39274b;
-          border-radius: 15px;
-          padding: 25px;
-        }
-
-        .stat-card span {
-          color: #b9a9d0;
-          font-size: 13px;
-        }
-
-        .stat-card h2 {
-          color: #c58aff;
-          font-size: 27px;
-          margin: 15px 0 0;
-        }
-
-        .content {
-          margin-bottom: 25px;
-        }
-
-        .content h2 {
-          margin-top: 0;
-        }
-
-        .content > p,
-        .section-heading p {
-          color: #b9a9d0;
-          margin-bottom: 25px;
-        }
-
-        .section-heading {
-          margin-bottom: 20px;
-        }
-
-        .empty {
-          padding: 35px;
-          text-align: center;
-          color: #b9a9d0;
-          background: #160e21;
-          border-radius: 10px;
-        }
-
-        .table-wrapper {
-          overflow-x: auto;
-        }
-
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          min-width: 800px;
-        }
-
-        th,
-        td {
-          padding: 16px;
-          text-align: left;
-          border-bottom: 1px solid #39274b;
-        }
-
-        th {
-          color: #bd83ff;
-          font-size: 12px;
-          white-space: nowrap;
-        }
-
-        td {
-          color: #eee5fa;
-          font-size: 13px;
-        }
-
-        .checked-status {
-          color: #65e5a4;
-          background: #183d30;
-          padding: 6px 10px;
-          border-radius: 20px;
-          font-size: 11px;
-          white-space: nowrap;
-        }
-
-        .pending-status {
-          color: #ffc76a;
-          background: #49351d;
-          padding: 6px 10px;
-          border-radius: 20px;
-          font-size: 11px;
-          white-space: nowrap;
-        }
-
-        @media (max-width: 900px) {
-          .stats {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
-
-        @media (max-width: 700px) {
-          .dashboard {
-            padding: 22px;
-          }
-
-          .stats {
-            grid-template-columns: 1fr;
-          }
-
-          .header {
-            align-items: flex-start;
-            flex-direction: column;
-          }
-
-          .header-actions {
-            width: 100%;
-          }
-        }
-      `}</style>
     </main>
   );
 }

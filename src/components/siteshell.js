@@ -21,7 +21,7 @@ function SiteShellContent({ children }) {
   }
 
   return (
-    <div className="encore-site-shell">
+    <div className="flex min-h-screen w-full flex-col [&>main]:flex-1 [&_main_footer.footer]:hidden">
       <Navbar />
 
       {children}
@@ -33,24 +33,16 @@ function SiteShellContent({ children }) {
 
 function SiteShellFallback({ children }) {
   return (
-    <div className="encore-shell-fallback">
-      {children}
-    </div>
+    <div className="min-h-screen bg-background text-text">{children}</div>
   );
 }
 
 export default function SiteShell({ children }) {
   return (
     <Suspense
-      fallback={
-        <SiteShellFallback>
-          {children}
-        </SiteShellFallback>
-      }
+      fallback={<SiteShellFallback>{children}</SiteShellFallback>}
     >
-      <SiteShellContent>
-        {children}
-      </SiteShellContent>
+      <SiteShellContent>{children}</SiteShellContent>
     </Suspense>
   );
 }

@@ -1,32 +1,88 @@
-
 "use client";
-
+ 
 import { Suspense, use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { concerts, formatPrice } from "../../../data/concerts";
-
+ 
+// ======================================
+// KELAS TAILWIND
+// ======================================
+ 
+const pageBg =
+  "relative isolate min-h-screen w-full bg-[#090714] bg-[image:linear-gradient(180deg,rgba(9,7,20,0.48)_0%,rgba(9,7,20,0.70)_48%,rgba(9,7,20,0.88)_100%),url('/images/bg%20konser.jpg')] bg-cover bg-[position:center_top] bg-fixed bg-no-repeat text-white max-[700px]:bg-scroll";
+ 
+const loadingBox =
+  "flex min-h-screen items-center justify-center text-white";
+ 
+const eyebrow =
+  "text-xs leading-[1.6] font-bold tracking-[2px] text-primary-light";
+ 
+const primaryBtn =
+  "inline-flex cursor-pointer items-center justify-center gap-4 rounded-[9px] border-none bg-primary px-[22px] py-3.5 text-center font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#7c3aed] hover:shadow-[0_8px_25px_#8b5cf640]";
+ 
+const panel =
+  "rounded-2xl border border-border bg-surface p-[30px] max-[700px]:p-[22px]";
+const panelTitle =
+  "my-[13px] font-heading text-[29px] font-bold";
+const muted = "leading-[1.8] text-muted";
+const demoNote = "mt-[18px] text-xs leading-[1.7] text-muted";
+ 
+const descP = "mb-[15px] text-sm leading-[1.9] text-[#b8b1ca]";
+ 
+const tabClass = (active) =>
+  `cursor-pointer border-0 border-b-2 bg-transparent px-4 py-[13px] font-semibold hover:text-primary-light max-[480px]:px-[9px] max-[480px]:py-3 max-[480px]:text-xs ${
+    active
+      ? "border-primary text-primary-light"
+      : "border-transparent text-muted"
+  }`;
+ 
+const ticketCardClass = (isVip, isSelected) => {
+  if (isVip) {
+    return `overflow-hidden rounded-[13px] border-2 transition-all duration-200 ${
+      isSelected
+        ? "border-[#e7bd75] bg-[linear-gradient(135deg,#573022,#30202b_65%,#151126)] shadow-[0_0_28px_#d6a45d28]"
+        : "border-[#b58a50] bg-[linear-gradient(135deg,#49251e,#281923_65%,#151126)] hover:border-[#e7bd75] hover:bg-[linear-gradient(135deg,#573022,#30202b_65%,#151126)] hover:shadow-[0_0_28px_#d6a45d28]"
+    }`;
+  }
+ 
+  return `overflow-hidden rounded-[13px] border transition-all duration-200 ${
+    isSelected
+      ? "border-[#a78bfa] bg-[#211735] shadow-[0_0_0_1px_#8b5cf62b]"
+      : "border-border bg-[#090714] hover:border-primary"
+  }`;
+};
+ 
+const mapLink =
+  "inline-flex min-h-[46px] items-center justify-center gap-2.5 rounded-[10px] border px-[19px] py-[13px] text-[13px] font-bold transition duration-[250ms] hover:-translate-y-0.5 max-[700px]:w-full";
+ 
+const summaryRow =
+  "mb-5 flex justify-between gap-[15px] text-[13px] max-[480px]:flex-wrap";
+const summaryValue = "text-right font-bold [overflow-wrap:anywhere]";
+const qtyBtn =
+  "size-8 cursor-pointer rounded-[7px] border border-[#49316d] bg-background text-[19px] text-white disabled:cursor-not-allowed disabled:opacity-40";
+ 
 function ConcertDetailContent({ params }) {
   const router = useRouter();
   const { id } = use(params);
-
+ 
   const [activeTab, setActiveTab] = useState("description");
   const [selectedTicket, setSelectedTicket] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [imageError, setImageError] = useState(false);
   const [allConcerts, setAllConcerts] = useState(concerts);
   const [eventsLoaded, setEventsLoaded] = useState(false);
-
+ 
   // ======================================
   // AMBIL EVENT BAWAAN DAN EVENT ORGANIZER
   // ======================================
-
+ 
   useEffect(() => {
     try {
       const savedEvents = JSON.parse(
         localStorage.getItem("encoreCustomConcerts") || "[]"
       );
-
+ 
       const combinedEvents = [
         ...concerts,
         ...savedEvents.filter(
@@ -36,7 +92,7 @@ function ConcertDetailContent({ params }) {
             )
         ),
       ];
-
+ 
       setAllConcerts(combinedEvents);
     } catch (error) {
       console.error("Gagal membaca event Organizer:", error);
@@ -45,39 +101,35 @@ function ConcertDetailContent({ params }) {
       setEventsLoaded(true);
     }
   }, []);
-
+ 
   const concert = allConcerts.find(
     (item) => String(item.id) === String(id)
   );
-
+ 
   if (!eventsLoaded) {
     return (
-      <main className="ticket-detail-page">
-        <div style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "#ffffff"
-        }}>
-          Memuat detail konser...
-        </div>
+      <main className={pageBg}>
+        <div className={loadingBox}>Memuat detail konser...</div>
       </main>
     );
   }
-
+ 
   if (!concert) {
     return (
-      <main className="ticket-not-found">
-        <h1>Konser Tidak Ditemukan</h1>
-        <p>Konser yang kamu cari belum tersedia.</p>
-        <Link href="/concerts" className="primary-btn">
+      <main className="min-h-[70vh] bg-background px-[7%] py-[100px] text-center text-white">
+        <h1 className="font-heading text-[32px] font-bold">
+          Konser Tidak Ditemukan
+        </h1>
+        <p className="mt-[18px] mb-[25px] text-muted">
+          Konser yang kamu cari belum tersedia.
+        </p>
+        <Link href="/concerts" className={primaryBtn}>
           Kembali ke Concerts
         </Link>
       </main>
     );
   }
-
+ 
   const tickets =
     concert.tickets && concert.tickets.length > 0
       ? concert.tickets
@@ -89,195 +141,205 @@ function ConcertDetailContent({ params }) {
             color: "#8B5CF6",
           },
         ];
-
+ 
   const activeTicket =
     tickets[selectedTicket] ?? tickets[0];
-
+ 
   const subtotal = activeTicket.price * quantity;
-
+ 
   const venueName = concert.venue?.trim() || "";
-
+ 
   const hasSpecificVenue =
     venueName.length > 0 &&
     venueName.toLowerCase() !==
       concert.location?.trim().toLowerCase();
-
+ 
   const venueQuery = hasSpecificVenue
     ? `${venueName}, ${concert.location}, Indonesia`
     : "";
-
+ 
   const googleMapsEmbed = venueQuery
     ? `https://www.google.com/maps?q=${encodeURIComponent(
         venueQuery
       )}&output=embed`
     : "";
-
+ 
   const googleMapsLink = venueQuery
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
         venueQuery
       )}`
     : "";
-
+ 
   const googleMapsDirections = venueQuery
     ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
         venueQuery
       )}`
     : "";
-
+ 
+  const isVipCard = (ticket) => Boolean(ticket.isVip);
+ 
   return (
-    <main className="ticket-detail-page">
-
-      <div className="ticket-breadcrumb">
-        <Link href="/">Home</Link>
+    <main className={pageBg}>
+      {/* BREADCRUMB */}
+ 
+      <div className="flex flex-wrap items-center gap-3 px-[7%] py-7 text-[13px] text-muted max-[700px]:px-[5%] max-[700px]:py-[22px]">
+        <Link href="/" className="hover:text-primary-light">
+          Home
+        </Link>
         <span>/</span>
-        <Link href="/concerts">Concerts</Link>
+        <Link href="/concerts" className="hover:text-primary-light">
+          Concerts
+        </Link>
         <span>/</span>
         <span>{concert.title}</span>
       </div>
-
-      <section className="ticket-banner">
+ 
+      {/* BANNER */}
+ 
+      <section className="relative mx-[7%] mb-[45px] h-[440px] overflow-hidden rounded-[20px] border border-border max-[700px]:mx-[5%] max-[700px]:mb-[30px] max-[700px]:h-[330px] max-[480px]:h-[280px]">
         <img
           src={concert.image || "/images/default-concert.jpg"}
           alt={`Poster ${concert.title}`}
+          className="size-full object-cover"
         />
-
-        <div className="ticket-banner-overlay">
-          <span className="eyebrow">
-            EVERY CONCERT STARTS WITH ENCORE
-          </span>
-
-          <h1>{concert.title}</h1>
-          <p>{concert.subtitle || concert.artist}</p>
+ 
+        <div className="absolute inset-0 flex flex-col justify-end bg-[linear-gradient(0deg,#090714_0%,#090714bb_35%,transparent_85%)] p-[45px] max-[700px]:p-[25px]">
+          <span className={eyebrow}>EVERY CONCERT STARTS WITH ENCORE</span>
+ 
+          <h1 className="mt-[15px] mb-2.5 font-heading text-[clamp(34px,5vw,58px)] leading-[1.15] font-bold max-[480px]:text-[32px]">
+            {concert.title}
+          </h1>
+          <p className="text-[17px] text-[#ded4ee]">
+            {concert.subtitle || concert.artist}
+          </p>
         </div>
       </section>
-
-      <div className="ticket-layout">
-
-        <div className="ticket-main-content">
-
-          <section className="ticket-panel">
-            <span className="eyebrow">
-              LIVE MUSIC EXPERIENCE
-            </span>
-
-            <h2>{concert.title}</h2>
-
-            <p className="ticket-artist">
-              {concert.subtitle || concert.artist}
-            </p>
-
-            <div className="ticket-event-info">
-
-              <div>
-                <span>📅</span>
+ 
+      {/* LAYOUT */}
+ 
+      <div className="grid grid-cols-[minmax(0,1.7fr)_minmax(300px,1fr)] items-start gap-7 px-[7%] pb-[90px] max-[900px]:grid-cols-1 max-[700px]:px-[5%] max-[700px]:pb-[60px]">
+        <div className="flex min-w-0 flex-col gap-[25px]">
+          {/* INFO EVENT */}
+ 
+          <section className={panel}>
+            <span className={eyebrow}>LIVE MUSIC EXPERIENCE</span>
+ 
+            <h2 className={panelTitle}>{concert.title}</h2>
+ 
+            <p className={muted}>{concert.subtitle || concert.artist}</p>
+ 
+            <div className="mt-7 grid grid-cols-3 gap-5 border-t border-border pt-6 max-[700px]:grid-cols-1">
+              <div className="flex items-start gap-3">
+                <span className="text-[22px]">📅</span>
                 <div>
-                  <small>Tanggal Konser</small>
-                  <strong>{concert.date}</strong>
+                  <small className="block text-xs text-muted">
+                    Tanggal Konser
+                  </small>
+                  <strong className="mt-[7px] block text-[13px] font-bold [overflow-wrap:anywhere]">
+                    {concert.date}
+                  </strong>
                 </div>
               </div>
-
-              <div>
-                <span>📍</span>
+ 
+              <div className="flex items-start gap-3">
+                <span className="text-[22px]">📍</span>
                 <div>
-                  <small>Lokasi</small>
-                  <strong>
+                  <small className="block text-xs text-muted">Lokasi</small>
+                  <strong className="mt-[7px] block text-[13px] font-bold [overflow-wrap:anywhere]">
                     {concert.venue || concert.location}
                   </strong>
                 </div>
               </div>
-
-              <div>
-                <span>🎤</span>
+ 
+              <div className="flex items-start gap-3">
+                <span className="text-[22px]">🎤</span>
                 <div>
-                  <small>Artist</small>
-                  <strong>{concert.artist}</strong>
+                  <small className="block text-xs text-muted">Artist</small>
+                  <strong className="mt-[7px] block text-[13px] font-bold [overflow-wrap:anywhere]">
+                    {concert.artist}
+                  </strong>
                 </div>
               </div>
-
             </div>
           </section>
-
-          <section className="ticket-panel">
-
-            <div className="ticket-tabs">
-
+ 
+          {/* DESKRIPSI / SYARAT */}
+ 
+          <section className={panel}>
+            <div className="mb-[25px] flex gap-3 border-b border-border max-[480px]:gap-1">
               <button
                 type="button"
-                className={
-                  activeTab === "description" ? "active" : ""
-                }
+                className={tabClass(activeTab === "description")}
                 onClick={() => setActiveTab("description")}
               >
                 Deskripsi
               </button>
-
+ 
               <button
                 type="button"
-                className={
-                  activeTab === "terms" ? "active" : ""
-                }
+                className={tabClass(activeTab === "terms")}
                 onClick={() => setActiveTab("terms")}
               >
                 Syarat & Ketentuan
               </button>
-
             </div>
-
+ 
             {activeTab === "description" ? (
-              <div className="ticket-description">
-                <h3>Tentang Konser</h3>
-
-                <p>
+              <div>
+                <h3 className="mb-[18px] font-heading text-[22px] font-bold">
+                  Tentang Konser
+                </h3>
+ 
+                <p className={descP}>
                   {concert.description ||
                     "Temukan pengalaman konser yang berkesan bersama ENCORE."}
                 </p>
-
-                <p>
-                  Temukan pengalaman konser yang
-                  berkesan bersama ENCORE.
+ 
+                <p className={descP}>
+                  Temukan pengalaman konser yang berkesan bersama ENCORE.
                 </p>
-
-                <p>
-                  Pilih kategori tiket, lihat denah,
-                  dan siapkan dirimu untuk momen
-                  yang tak terlupakan.
+ 
+                <p className={descP}>
+                  Pilih kategori tiket, lihat denah, dan siapkan dirimu untuk
+                  momen yang tak terlupakan.
                 </p>
               </div>
             ) : (
-              <div className="ticket-description">
-                <h3>Syarat & Ketentuan</h3>
-
-                <ul>
+              <div>
+                <h3 className="mb-[18px] font-heading text-[22px] font-bold">
+                  Syarat & Ketentuan
+                </h3>
+ 
+                <ul className="list-disc pl-5">
                   {(concert.notes || []).map((note, index) => (
-                    <li key={index}>{note}</li>
+                    <li key={index} className={descP}>
+                      {note}
+                    </li>
                   ))}
                 </ul>
               </div>
             )}
-
           </section>
-
+ 
+          {/* SEATING PLAN */}
+ 
           {concert.seatingPlan && (
-            <section className="ticket-panel">
-
-              <span className="eyebrow">
-                VENUE SEATING PLAN
-              </span>
-
-              <h2>
+            <section className={panel}>
+              <span className={eyebrow}>VENUE SEATING PLAN</span>
+ 
+              <h2 className={panelTitle}>
                 {concert.id === 6
                   ? "Informasi Harga Tiket"
                   : "Denah Tempat Duduk"}
               </h2>
-
-              <p className="ticket-muted">
+ 
+              <p className={muted}>
                 {concert.id === 6
                   ? "Lihat daftar harga tiket Regular dan VIP untuk Day 1 dan Day 2."
                   : "Lihat posisi panggung dan kategori tiket sebelum menentukan tempat dudukmu."}
               </p>
-
-              <div className="encore-seating-frame">
-
+ 
+              <div className="mt-[25px] w-full overflow-hidden rounded-2xl border border-[#49316d] bg-[#100b20] p-3.5 max-[700px]:p-[7px]">
                 {!imageError ? (
                   <img
                     src={concert.seatingPlan}
@@ -287,380 +349,349 @@ function ConcertDetailContent({ params }) {
                         : `Seating plan ${concert.title}`
                     }
                     onError={() => setImageError(true)}
+                    className="block h-auto w-full rounded-[10px] object-contain"
                   />
                 ) : (
-                  <div className="encore-seating-placeholder">
-
-                    <span className="encore-placeholder-icon">
+                  <div className="flex min-h-[310px] flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-[#594578] bg-[#191329] p-[30px] text-center max-[700px]:min-h-[220px] max-[700px]:p-5">
+                    <span className="text-[55px] leading-none text-primary-light">
                       ▧
                     </span>
-
-                    <h3>
-                      {concert.id === 6
-                        ? "Informasi Tiket"
-                        : "Seating Plan"}
+ 
+                    <h3 className="font-heading text-[23px] font-bold text-white">
+                      {concert.id === 6 ? "Informasi Tiket" : "Seating Plan"}
                     </h3>
-
-                    <p>
-                      Gambar informasi tiket akan
-                      ditampilkan di sini.
+ 
+                    <p className="text-[13px] leading-[1.7] text-muted">
+                      Gambar informasi tiket akan ditampilkan di sini.
                     </p>
-
-                    <small>public/images/</small>
-
+ 
+                    <small className="text-[13px] leading-[1.7] text-muted">
+                      public/images/
+                    </small>
                   </div>
                 )}
-
               </div>
-
-              <p className="ticket-demo-note">
+ 
+              <p className={demoNote}>
                 {concert.id === 6
                   ? "* Harga mengikuti informasi pada poster penyelenggara dan belum termasuk pajak serta admin fee."
                   : "* Denah merupakan ilustrasi area kategori tiket. Tata letak aktual mengikuti penyelenggara."}
               </p>
-
             </section>
           )}
-
-          <section
-            className="ticket-panel"
-            id="select-tickets"
-          >
-
-            <span className="eyebrow">
-              CHOOSE YOUR EXPERIENCE
-            </span>
-
-            <h2>Pilih Kategori Tiket</h2>
-
-            <p className="ticket-muted">
-              Pilih kategori tiket sesuai pengalaman
-              konser yang kamu inginkan.
+ 
+          {/* PILIH TIKET */}
+ 
+          <section className={panel} id="select-tickets">
+            <span className={eyebrow}>CHOOSE YOUR EXPERIENCE</span>
+ 
+            <h2 className={panelTitle}>Pilih Kategori Tiket</h2>
+ 
+            <p className={muted}>
+              Pilih kategori tiket sesuai pengalaman konser yang kamu inginkan.
             </p>
-
-            <div className="ticket-options">
-
+ 
+            <div className="mt-7 flex flex-col gap-[13px]">
               {tickets.map((ticket, index) => {
                 const isSelected = selectedTicket === index;
-
+                const vip = isVipCard(ticket);
+ 
                 return (
                   <div
                     key={`${ticket.name}-${index}`}
-                    className={`encore-ticket-card ${
-                      ticket.isVip ? "encore-vip-card" : ""
-                    } ${
-                      isSelected ? "encore-ticket-selected" : ""
-                    }`}
+                    className={ticketCardClass(vip, isSelected)}
                   >
-
                     <button
                       type="button"
-                      className="encore-ticket-select"
+                      className="flex w-full cursor-pointer items-center gap-[15px] border-none bg-transparent p-5 text-left text-white max-[700px]:flex-wrap max-[700px]:p-[17px]"
                       onClick={() => {
                         setSelectedTicket(index);
                         setQuantity(1);
                       }}
                       aria-pressed={isSelected}
                     >
-
                       <span
-                        className="encore-ticket-color"
+                        className="h-[45px] w-[15px] min-w-[15px] rounded-[4px]"
                         style={{
-                          backgroundColor:
-                            ticket.color || "#8B5CF6",
+                          backgroundColor: ticket.color || "#8B5CF6",
                         }}
                       />
-
-                      <span className="encore-ticket-information">
-
+ 
+                      <span className="flex min-w-0 flex-1 flex-col items-start gap-[7px] max-[700px]:min-w-[180px]">
                         {ticket.isVip && (
-                          <span className="encore-vip-badge">
+                          <span className="inline-flex items-center rounded-md border border-[#d5a35d70] bg-[#d5a35d24] px-[11px] py-1.5 text-[10px] font-extrabold tracking-[1.2px] text-[#f2ce89]">
                             ★ VIP EXCLUSIVE
                           </span>
                         )}
-
-                        <strong>{ticket.name}</strong>
-
-                        <small>{ticket.description}</small>
-
+ 
+                        <strong
+                          className={`font-heading font-bold ${
+                            vip
+                              ? "text-[21px] text-[#ffe2a6]"
+                              : "text-[17px]"
+                          }`}
+                        >
+                          {ticket.name}
+                        </strong>
+ 
+                        <small className="text-xs text-muted">
+                          {ticket.description}
+                        </small>
                       </span>
-
-                      <span className="encore-ticket-price-area">
-
-                        <strong>
+ 
+                      <span className="flex shrink-0 items-center gap-[15px] max-[700px]:w-full max-[700px]:justify-between max-[700px]:pl-[30px]">
+                        <strong
+                          className={`font-bold whitespace-nowrap ${
+                            vip
+                              ? "text-[17px] text-[#f2ce89]"
+                              : "text-[15px] text-[#c4b5fd]"
+                          }`}
+                        >
                           {formatPrice(ticket.price)}
                         </strong>
-
-                        <span className="encore-ticket-check">
+ 
+                        <span
+                          className={`text-2xl ${
+                            vip ? "text-[#f2ce89]" : "text-primary-light"
+                          }`}
+                        >
                           {isSelected ? "●" : "○"}
                         </span>
-
                       </span>
-
                     </button>
-
-                    {ticket.benefits &&
-                      ticket.benefits.length > 0 && (
-                        <div className="encore-vip-benefits">
-
-                          <div className="encore-vip-benefits-heading">
-                            <span>✦</span>
-                            <h4>VIP Package Benefits</h4>
-                          </div>
-
-                          <div className="encore-vip-benefit-list">
-
-                            {ticket.benefits.map(
-                              (benefit, benefitIndex) => (
-                                <div
-                                  className="encore-vip-benefit"
-                                  key={benefitIndex}
-                                >
-                                  <span>✓</span>
-                                  <p>{benefit}</p>
-                                </div>
-                              )
-                            )}
-
-                          </div>
-
+ 
+                    {ticket.benefits && ticket.benefits.length > 0 && (
+                      <div className="mx-5 mb-5 rounded-b-[9px] border-t border-[#d5a35d50] bg-[#09071435] p-5 max-[700px]:mx-[15px] max-[700px]:mb-[15px] max-[700px]:px-2.5 max-[700px]:py-[17px]">
+                        <div className="mb-[17px] flex items-center gap-2.5">
+                          <span className="text-[21px] text-[#f2ce89]">✦</span>
+                          <h4 className="font-heading text-[15px] font-bold text-[#f2ce89]">
+                            VIP Package Benefits
+                          </h4>
                         </div>
-                      )}
-
+ 
+                        <div className="grid grid-cols-2 gap-x-5 gap-y-3 max-[700px]:grid-cols-1">
+                          {ticket.benefits.map((benefit, benefitIndex) => (
+                            <div
+                              className="flex items-start gap-[9px]"
+                              key={benefitIndex}
+                            >
+                              <span className="text-sm font-bold text-[#f2ce89]">
+                                ✓
+                              </span>
+                              <p className="text-xs leading-[1.6] text-[#e6d6c5]">
+                                {benefit}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
-
             </div>
-
-            <p className="ticket-demo-note">
-              * Harga tiket belum termasuk pajak
-              dan biaya tambahan.
+ 
+            <p className={demoNote}>
+              * Harga tiket belum termasuk pajak dan biaya tambahan.
             </p>
-
           </section>
-
-          <section
-            className="ticket-panel encore-location-section"
-            id="concert-location"
-          >
-
-            <span className="eyebrow">
-              FIND YOUR VENUE
-            </span>
-
-            <h2>Lokasi Konser</h2>
-
-            <p className="ticket-muted">
-              Temukan lokasi konsermu dan
-              rencanakan perjalanan dengan mudah.
+ 
+          {/* LOKASI */}
+ 
+          <section className={`${panel} scroll-mt-[100px]`} id="concert-location">
+            <span className={eyebrow}>FIND YOUR VENUE</span>
+ 
+            <h2 className={panelTitle}>Lokasi Konser</h2>
+ 
+            <p className={muted}>
+              Temukan lokasi konsermu dan rencanakan perjalanan dengan mudah.
             </p>
-
-            <div className="encore-location-card">
-
-              <div className="encore-location-header">
-
-                <div className="encore-location-icon">
+ 
+            <div className="mt-[25px] overflow-hidden rounded-[17px] border border-[#49316d] bg-[#100b20]">
+              <div className="flex items-center gap-4 border-b border-border bg-[linear-gradient(120deg,#1d1431,#120d22)] px-[25px] py-[23px] max-[700px]:gap-3 max-[700px]:px-[17px] max-[700px]:py-5">
+                <div className="flex size-[52px] shrink-0 items-center justify-center rounded-[13px] bg-[#8b5cf625] text-[25px] max-[700px]:size-11 max-[700px]:text-[22px]">
                   📍
                 </div>
-
-                <div className="encore-location-heading">
-
-                  <span>CONCERT VENUE</span>
-
-                  <h3>
-                    {hasSpecificVenue
-                      ? venueName
-                      : "Lokasi Belum Diumumkan"}
+ 
+                <div className="min-w-0">
+                  <span className="text-[10px] font-extrabold tracking-[1.5px] text-primary-light">
+                    CONCERT VENUE
+                  </span>
+ 
+                  <h3 className="mt-1.5 font-heading text-xl leading-[1.4] font-bold text-[#f8fafc] [overflow-wrap:anywhere] max-[700px]:text-[17px]">
+                    {hasSpecificVenue ? venueName : "Lokasi Belum Diumumkan"}
                   </h3>
-
-                  <p>
+ 
+                  <p className="mt-1.5 text-[13px] text-muted">
                     {concert.location}, Indonesia
                   </p>
-
                 </div>
-
               </div>
-
+ 
               {hasSpecificVenue ? (
                 <>
-
-                  <div className="encore-map-frame">
+                  <div className="relative h-[340px] w-full overflow-hidden bg-[#18132a] max-[700px]:h-[280px]">
                     <iframe
                       title={`Google Maps ${venueName}`}
                       src={googleMapsEmbed}
                       loading="lazy"
                       allowFullScreen
                       referrerPolicy="no-referrer-when-downgrade"
+                      className="block size-full border-none"
                     />
                   </div>
-
-                  <div className="encore-map-actions">
-
+ 
+                  <div className="flex flex-wrap gap-[13px] px-[25px] pt-[23px] pb-[15px] max-[700px]:flex-col max-[700px]:px-[17px] max-[700px]:pt-[17px] max-[700px]:pb-3">
                     <a
                       href={googleMapsLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="encore-map-primary"
+                      className={`${mapLink} border-primary bg-primary text-white hover:border-[#7c3aed] hover:bg-[#7c3aed] hover:shadow-[0_8px_20px_#8b5cf630]`}
                     >
                       🗺️ Lihat di Google Maps
                     </a>
-
+ 
                     <a
                       href={googleMapsDirections}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="encore-map-secondary"
+                      className={`${mapLink} border-[#49316d] bg-[#211735] text-[#d8c4ff] hover:border-[#a78bfa] hover:bg-[#302047] hover:text-white`}
                     >
                       Petunjuk Arah
                     </a>
-
                   </div>
-
-                  <p className="encore-location-note">
-                    * Lokasi dicari berdasarkan nama
-                    venue. Periksa kembali pintu masuk
-                    dan titik kedatangan sesuai
-                    informasi penyelenggara.
+ 
+                  <p className="px-[25px] pb-[23px] text-[11px] leading-[1.8] text-[#9990aa] max-[700px]:px-[17px] max-[700px]:pb-5">
+                    * Lokasi dicari berdasarkan nama venue. Periksa kembali
+                    pintu masuk dan titik kedatangan sesuai informasi
+                    penyelenggara.
                   </p>
-
                 </>
               ) : (
-
-                <div className="encore-location-unavailable">
-
-                  <div className="encore-location-unavailable-icon">
+                <div className="flex flex-col items-center bg-[#100b20] bg-[radial-gradient(ellipse_at_center,#8b5cf61a,transparent_70%)] px-[25px] py-12 text-center max-[700px]:px-[17px] max-[700px]:py-10">
+                  <div className="mb-5 flex size-[76px] items-center justify-center rounded-[18px] border border-[#49316d] bg-[#8b5cf620] text-4xl">
                     🗺️
                   </div>
-
-                  <h3>Detail Lokasi Segera Hadir</h3>
-
-                  <p>
+ 
+                  <h3 className="font-heading text-[22px] font-bold text-[#f8fafc]">
+                    Detail Lokasi Segera Hadir
+                  </h3>
+ 
+                  <p className="mt-[13px] max-w-[440px] text-[13px] leading-[1.8] text-[#b5aac8]">
                     Informasi venue spesifik untuk
                     {` ${concert.title} `}
                     belum tersedia pada data acara.
                   </p>
-
-                  <p>
+ 
+                  <p className="mt-[13px] max-w-[440px] text-[13px] leading-[1.8] text-[#b5aac8]">
                     Lokasi yang tercantum saat ini:
-                    <strong>
-                      {" "}{concert.location}, Indonesia
+                    <strong className="font-bold text-[#e9d5ff]">
+                      {" "}
+                      {concert.location}, Indonesia
                     </strong>
                   </p>
-
-                  <span>
-                    Pantau informasi dari penyelenggara
-                    untuk mengetahui alamat venue.
+ 
+                  <span className="mt-[22px] max-w-[430px] text-xs leading-[1.7] text-primary-light">
+                    Pantau informasi dari penyelenggara untuk mengetahui alamat
+                    venue.
                   </span>
-
                 </div>
-
               )}
-
             </div>
-
           </section>
-
         </div>
-
-        <aside className="ticket-booking-card">
-
-          <span className="eyebrow">
-            YOUR TICKET
-          </span>
-
-          <h3>Ringkasan Pemesanan</h3>
-
-          <div className="ticket-summary-row">
-            <span>Konser</span>
-            <strong>{concert.title}</strong>
+ 
+        {/* RINGKASAN PEMESANAN */}
+ 
+        <aside className="sticky top-[25px] rounded-2xl border border-[#49316d] bg-surface-light p-7 max-[900px]:static max-[700px]:p-[22px]">
+          <span className={eyebrow}>YOUR TICKET</span>
+ 
+          <h3 className="mt-3 mb-[27px] font-heading text-[23px] font-bold">
+            Ringkasan Pemesanan
+          </h3>
+ 
+          <div className={summaryRow}>
+            <span className="text-muted">Konser</span>
+            <strong className={summaryValue}>{concert.title}</strong>
           </div>
-
-          <div className="ticket-summary-row">
-            <span>Kategori</span>
-            <strong>{activeTicket.name}</strong>
+ 
+          <div className={summaryRow}>
+            <span className="text-muted">Kategori</span>
+            <strong className={summaryValue}>{activeTicket.name}</strong>
           </div>
-
-          <div className="ticket-summary-row">
-            <span>
-              {activeTicket.persons
-                ? "Harga per Paket"
-                : "Harga per Tiket"}
+ 
+          <div className={summaryRow}>
+            <span className="text-muted">
+              {activeTicket.persons ? "Harga per Paket" : "Harga per Tiket"}
             </span>
-
-            <strong>{formatPrice(activeTicket.price)}</strong>
+ 
+            <strong className={summaryValue}>
+              {formatPrice(activeTicket.price)}
+            </strong>
           </div>
-
+ 
           {activeTicket.persons && (
-            <div className="ticket-summary-row">
-              <span>Peserta per Paket</span>
-              <strong>{activeTicket.persons} orang</strong>
+            <div className={summaryRow}>
+              <span className="text-muted">Peserta per Paket</span>
+              <strong className={summaryValue}>
+                {activeTicket.persons} orang
+              </strong>
             </div>
           )}
-
-          <div className="ticket-quantity-section">
-
+ 
+          <div className="flex items-center justify-between gap-3 border-t border-[#49316d] py-5 text-[13px]">
             <span>
-              {activeTicket.persons
-                ? "Jumlah Paket"
-                : "Jumlah Tiket"}
+              {activeTicket.persons ? "Jumlah Paket" : "Jumlah Tiket"}
             </span>
-
-            <div className="ticket-quantity">
-
+ 
+            <div className="flex items-center gap-[17px]">
               <button
                 type="button"
                 disabled={quantity <= 1}
-                onClick={() =>
-                  setQuantity((prev) =>
-                    Math.max(1, prev - 1)
-                  )
-                }
+                onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
                 aria-label="Kurangi jumlah"
+                className={qtyBtn}
               >
                 −
               </button>
-
-              <strong>{quantity}</strong>
-
+ 
+              <strong className="font-bold">{quantity}</strong>
+ 
               <button
                 type="button"
                 disabled={quantity >= 4}
-                onClick={() =>
-                  setQuantity((prev) =>
-                    Math.min(4, prev + 1)
-                  )
-                }
+                onClick={() => setQuantity((prev) => Math.min(4, prev + 1))}
                 aria-label="Tambah jumlah"
+                className={qtyBtn}
               >
                 +
               </button>
-
             </div>
-
           </div>
-
+ 
           {activeTicket.persons && (
-            <div className="ticket-summary-row">
-              <span>Total Peserta</span>
-              <strong>
+            <div className={summaryRow}>
+              <span className="text-muted">Total Peserta</span>
+              <strong className={summaryValue}>
                 {activeTicket.persons * quantity} orang
               </strong>
             </div>
           )}
-
-          <div className="ticket-total">
-            <span>Subtotal</span>
-            <strong>{formatPrice(subtotal)}</strong>
+ 
+          <div className="flex items-center justify-between gap-[15px] border-t border-[#49316d] py-[22px]">
+            <span className="text-[13px] text-muted">Subtotal</span>
+            <strong className="text-[23px] font-bold text-[#c4b5fd] max-[480px]:text-xl">
+              {formatPrice(subtotal)}
+            </strong>
           </div>
-
-          <p className="encore-booking-note">
+ 
+          <p className="-mt-[5px] mb-5 text-[11px] leading-[1.6] text-muted">
             Belum termasuk pajak dan biaya layanan.
           </p>
-
+ 
           <button
             type="button"
-            className="primary-btn ticket-buy-btn"
+            className={`${primaryBtn} w-full`}
             onClick={() => {
               router.push(
                 `/buyer/checkout?concertId=${concert.id}&ticketIndex=${selectedTicket}&quantity=${quantity}`
@@ -669,605 +700,22 @@ function ConcertDetailContent({ params }) {
           >
             Lanjutkan Pemesanan
           </button>
-
-          <p className="ticket-secure-note">
+ 
+          <p className="mt-[15px] text-center text-[11px] text-muted">
             🔒 Simulasi pemesanan ENCORE
           </p>
-
         </aside>
-
       </div>
-
-      <style>{`
-
-        /* BACKGROUND DETAIL KONSER */
-        .ticket-detail-page {
-          position: relative;
-          isolation: isolate;
-          min-height: 100vh;
-          width: 100%;
-          color: #ffffff;
-          background-color: #090714 !important;
-          background-image:
-            linear-gradient(
-              180deg,
-              rgba(9, 7, 20, 0.48) 0%,
-              rgba(9, 7, 20, 0.70) 48%,
-              rgba(9, 7, 20, 0.88) 100%
-            ),
-            url("/images/bg%20konser.jpg") !important;
-          background-position: center top !important;
-          background-size: cover !important;
-          background-repeat: no-repeat !important;
-          background-attachment: fixed !important;
-        }
-
-        @media (max-width: 700px) {
-          .ticket-detail-page {
-            background-attachment: scroll !important;
-          }
-        }
-
-        .encore-seating-frame {
-          width: 100%;
-          margin-top: 25px;
-          padding: 14px;
-          border: 1px solid #49316d;
-          border-radius: 16px;
-          background: #100b20;
-          overflow: hidden;
-        }
-
-        .encore-seating-frame img {
-          display: block;
-          width: 100%;
-          height: auto;
-          border-radius: 10px;
-          object-fit: contain;
-        }
-
-        .encore-seating-placeholder {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 12px;
-          min-height: 310px;
-          padding: 30px;
-          border: 2px dashed #594578;
-          border-radius: 12px;
-          background: #191329;
-          text-align: center;
-        }
-
-        .encore-placeholder-icon {
-          color: #a78bfa;
-          font-size: 55px;
-          line-height: 1;
-        }
-
-        .encore-seating-placeholder h3 {
-          color: white;
-          font-size: 23px;
-        }
-
-        .encore-seating-placeholder p,
-        .encore-seating-placeholder small {
-          color: #a5a0b8;
-          font-size: 13px;
-          line-height: 1.7;
-        }
-
-        .ticket-sale-box {
-          margin-top: 24px;
-          padding: 18px;
-          border: 1px solid #49316d;
-          border-radius: 14px;
-          background: #120d22;
-        }
-
-        .ticket-sale-box h3 {
-          margin-bottom: 14px;
-          font-family: "Outfit", sans-serif;
-          font-size: 18px;
-        }
-
-        .ticket-sale-row {
-          display: flex;
-          justify-content: space-between;
-          gap: 20px;
-          padding: 10px 0;
-          border-top: 1px solid #2c2340;
-        }
-
-        .ticket-sale-row:first-of-type {
-          border-top: none;
-          padding-top: 0;
-        }
-
-        .ticket-sale-row span {
-          color: #a5a0b8;
-          font-size: 13px;
-        }
-
-        .ticket-sale-row strong {
-          color: #f8fafc;
-          font-size: 13px;
-          text-align: right;
-        }
-
-        .encore-ticket-card {
-          overflow: hidden;
-          border: 1px solid #302747;
-          border-radius: 13px;
-          background: #090714;
-          transition: all 0.2s ease;
-        }
-
-        .encore-ticket-card:hover {
-          border-color: #8b5cf6;
-        }
-
-        .encore-ticket-card.encore-ticket-selected {
-          border-color: #a78bfa;
-          background: #211735;
-          box-shadow: 0 0 0 1px #8b5cf62b;
-        }
-
-        .encore-ticket-select {
-          display: flex;
-          align-items: center;
-          gap: 15px;
-          width: 100%;
-          padding: 20px;
-          border: none;
-          background: transparent;
-          color: white;
-          text-align: left;
-          cursor: pointer;
-        }
-
-        .encore-ticket-color {
-          width: 15px;
-          min-width: 15px;
-          height: 45px;
-          border-radius: 4px;
-        }
-
-        .encore-ticket-information {
-          display: flex;
-          flex: 1;
-          min-width: 0;
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 7px;
-        }
-
-        .encore-ticket-information > strong {
-          font-family: "Outfit", sans-serif;
-          font-size: 17px;
-        }
-
-        .encore-ticket-information > small {
-          color: #a5a0b8;
-          font-size: 12px;
-        }
-
-        .encore-ticket-price-area {
-          display: flex;
-          align-items: center;
-          gap: 15px;
-          flex-shrink: 0;
-        }
-
-        .encore-ticket-price-area > strong {
-          color: #c4b5fd;
-          font-size: 15px;
-          white-space: nowrap;
-        }
-
-        .encore-ticket-check {
-          color: #a78bfa;
-          font-size: 24px;
-        }
-
-        .encore-vip-card {
-          border: 2px solid #b58a50;
-          background: linear-gradient(
-            135deg,
-            #49251e,
-            #281923 65%,
-            #151126
-          );
-        }
-
-        .encore-vip-card:hover,
-        .encore-vip-card.encore-ticket-selected {
-          border-color: #e7bd75;
-          background: linear-gradient(
-            135deg,
-            #573022,
-            #30202b 65%,
-            #151126
-          );
-          box-shadow: 0 0 28px #d6a45d28;
-        }
-
-        .encore-vip-card
-          .encore-ticket-information > strong {
-          color: #ffe2a6;
-          font-size: 21px;
-        }
-
-        .encore-vip-card
-          .encore-ticket-price-area > strong {
-          color: #f2ce89;
-          font-size: 17px;
-        }
-
-        .encore-vip-card .encore-ticket-check {
-          color: #f2ce89;
-        }
-
-        .encore-vip-badge {
-          display: inline-flex;
-          align-items: center;
-          padding: 6px 11px;
-          border: 1px solid #d5a35d70;
-          border-radius: 6px;
-          background: #d5a35d24;
-          color: #f2ce89;
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 1.2px;
-        }
-
-        .encore-vip-benefits {
-          margin: 0 20px 20px;
-          padding: 20px;
-          border-top: 1px solid #d5a35d50;
-          border-radius: 0 0 9px 9px;
-          background: #09071435;
-        }
-
-        .encore-vip-benefits-heading {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin-bottom: 17px;
-        }
-
-        .encore-vip-benefits-heading span {
-          color: #f2ce89;
-          font-size: 21px;
-        }
-
-        .encore-vip-benefits-heading h4 {
-          color: #f2ce89;
-          font-size: 15px;
-        }
-
-        .encore-vip-benefit-list {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 12px 20px;
-        }
-
-        .encore-vip-benefit {
-          display: flex;
-          align-items: flex-start;
-          gap: 9px;
-        }
-
-        .encore-vip-benefit > span {
-          color: #f2ce89;
-          font-size: 14px;
-          font-weight: 700;
-        }
-
-        .encore-vip-benefit p {
-          color: #e6d6c5;
-          font-size: 12px;
-          line-height: 1.6;
-        }
-
-        .encore-booking-note {
-          margin: -5px 0 20px;
-          color: #a5a0b8;
-          font-size: 11px;
-          line-height: 1.6;
-        }
-
-        .encore-location-section {
-          scroll-margin-top: 100px;
-        }
-
-        .encore-location-card {
-          margin-top: 25px;
-          border: 1px solid #49316d;
-          border-radius: 17px;
-          background: #100b20;
-          overflow: hidden;
-        }
-
-        .encore-location-header {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          padding: 23px 25px;
-          background: linear-gradient(
-            120deg,
-            #1d1431,
-            #120d22
-          );
-          border-bottom: 1px solid #302747;
-        }
-
-        .encore-location-icon {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 52px;
-          height: 52px;
-          flex-shrink: 0;
-          border-radius: 13px;
-          background: #8b5cf625;
-          font-size: 25px;
-        }
-
-        .encore-location-heading {
-          min-width: 0;
-        }
-
-        .encore-location-heading > span {
-          color: #a78bfa;
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 1.5px;
-        }
-
-        .encore-location-heading h3 {
-          margin-top: 6px;
-          color: #f8fafc;
-          font-family: "Outfit", sans-serif;
-          font-size: 20px;
-          line-height: 1.4;
-          overflow-wrap: anywhere;
-        }
-
-        .encore-location-heading p {
-          margin-top: 6px;
-          color: #a5a0b8;
-          font-size: 13px;
-        }
-
-        .encore-map-frame {
-          position: relative;
-          width: 100%;
-          height: 340px;
-          overflow: hidden;
-          background: #18132a;
-        }
-
-        .encore-map-frame iframe {
-          display: block;
-          width: 100%;
-          height: 100%;
-          border: none;
-        }
-
-        .encore-map-actions {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 13px;
-          padding: 23px 25px 15px;
-        }
-
-        .encore-map-actions a {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          min-height: 46px;
-          padding: 13px 19px;
-          border-radius: 10px;
-          font-size: 13px;
-          font-weight: 700;
-          text-decoration: none;
-          transition: 0.25s ease;
-        }
-
-        .encore-map-primary {
-          background: #8b5cf6;
-          border: 1px solid #8b5cf6;
-          color: white;
-        }
-
-        .encore-map-primary:hover {
-          background: #7c3aed;
-          border-color: #7c3aed;
-          transform: translateY(-2px);
-          box-shadow: 0 8px 20px #8b5cf630;
-        }
-
-        .encore-map-secondary {
-          background: #211735;
-          border: 1px solid #49316d;
-          color: #d8c4ff;
-        }
-
-        .encore-map-secondary:hover {
-          border-color: #a78bfa;
-          background: #302047;
-          color: #ffffff;
-          transform: translateY(-2px);
-        }
-
-        .encore-location-note {
-          padding: 0 25px 23px;
-          color: #9990aa;
-          font-size: 11px;
-          line-height: 1.8;
-        }
-
-        .encore-location-unavailable {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          padding: 48px 25px;
-          text-align: center;
-          background:
-            radial-gradient(
-              ellipse at center,
-              #8b5cf61a,
-              transparent 70%
-            ),
-            #100b20;
-        }
-
-        .encore-location-unavailable-icon {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 76px;
-          height: 76px;
-          margin-bottom: 20px;
-          border: 1px solid #49316d;
-          border-radius: 18px;
-          background: #8b5cf620;
-          font-size: 36px;
-        }
-
-        .encore-location-unavailable h3 {
-          color: #f8fafc;
-          font-family: "Outfit", sans-serif;
-          font-size: 22px;
-        }
-
-        .encore-location-unavailable p {
-          max-width: 440px;
-          margin-top: 13px;
-          color: #b5aac8;
-          font-size: 13px;
-          line-height: 1.8;
-        }
-
-        .encore-location-unavailable p strong {
-          color: #e9d5ff;
-        }
-
-        .encore-location-unavailable > span {
-          max-width: 430px;
-          margin-top: 22px;
-          color: #a78bfa;
-          font-size: 12px;
-          line-height: 1.7;
-        }
-
-        @media (max-width: 700px) {
-
-          .ticket-sale-row {
-            flex-direction: column;
-            align-items: flex-start;
-          }
-
-          .ticket-sale-row strong {
-            text-align: left;
-          }
-
-          .encore-ticket-select {
-            flex-wrap: wrap;
-            padding: 17px;
-          }
-
-          .encore-ticket-information {
-            min-width: 180px;
-          }
-
-          .encore-ticket-price-area {
-            width: 100%;
-            justify-content: space-between;
-            padding-left: 30px;
-          }
-
-          .encore-vip-benefits {
-            margin: 0 15px 15px;
-            padding: 17px 10px;
-          }
-
-          .encore-vip-benefit-list {
-            grid-template-columns: 1fr;
-          }
-
-          .encore-seating-frame {
-            padding: 7px;
-          }
-
-          .encore-seating-placeholder {
-            min-height: 220px;
-            padding: 20px;
-          }
-
-          .encore-location-header {
-            padding: 20px 17px;
-            gap: 12px;
-          }
-
-          .encore-location-icon {
-            width: 44px;
-            height: 44px;
-            font-size: 22px;
-          }
-
-          .encore-location-heading h3 {
-            font-size: 17px;
-          }
-
-          .encore-map-frame {
-            height: 280px;
-          }
-
-          .encore-map-actions {
-            flex-direction: column;
-            padding: 17px 17px 12px;
-          }
-
-          .encore-map-actions a {
-            width: 100%;
-          }
-
-          .encore-location-note {
-            padding: 0 17px 20px;
-          }
-
-          .encore-location-unavailable {
-            padding: 40px 17px;
-          }
-
-        }
-
-      `}</style>
-
     </main>
   );
 }
-
+ 
 export default function ConcertDetailPage({ params }) {
   return (
     <Suspense
       fallback={
-        <main className="ticket-detail-page">
-          <div
-            style={{
-              minHeight: "100vh",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#ffffff",
-            }}
-          >
-            Memuat detail konser...
-          </div>
+        <main className={pageBg}>
+          <div className={loadingBox}>Memuat detail konser...</div>
         </main>
       }
     >

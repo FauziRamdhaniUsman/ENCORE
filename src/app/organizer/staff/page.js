@@ -1,10 +1,15 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { concerts } from "../../../data/concerts";
+
+const inputClass =
+  "mt-2 block w-full rounded-lg border border-[#493c60] bg-[#100b1c] p-3 text-white outline-none focus:border-primary-light";
+
+const buttonClass =
+  "mt-5 cursor-pointer rounded-lg border-0 bg-primary px-5 py-3 font-bold text-white transition hover:bg-[#7c3aed]";
 
 export default function StaffManagementPage() {
   const router = useRouter();
@@ -29,30 +34,22 @@ export default function StaffManagementPage() {
 
     setOrganizer(currentUser);
 
-    const users = JSON.parse(
-      localStorage.getItem("encoreUsers") || "[]"
-    );
+    const users = JSON.parse(localStorage.getItem("encoreUsers") || "[]");
 
     setStaff(
       users.filter(
         (user) =>
-          user.role === "checkin" &&
-          user.organizerId === currentUser.id
+          user.role === "checkin" && user.organizerId === currentUser.id
       )
     );
   }, [router]);
 
   const saveStaff = (updatedStaff) => {
-    const users = JSON.parse(
-      localStorage.getItem("encoreUsers") || "[]"
-    );
+    const users = JSON.parse(localStorage.getItem("encoreUsers") || "[]");
 
     const otherUsers = users.filter(
       (user) =>
-        !(
-          user.role === "checkin" &&
-          user.organizerId === organizer.id
-        )
+        !(user.role === "checkin" && user.organizerId === organizer.id)
     );
 
     localStorage.setItem(
@@ -82,17 +79,12 @@ export default function StaffManagementPage() {
       return;
     }
 
-    const users = JSON.parse(
-      localStorage.getItem("encoreUsers") || "[]"
-    );
+    const users = JSON.parse(localStorage.getItem("encoreUsers") || "[]");
 
     const normalizedEmail = email.trim().toLowerCase();
 
     if (
-      users.some(
-        (user) =>
-          user.email?.toLowerCase() === normalizedEmail
-      )
+      users.some((user) => user.email?.toLowerCase() === normalizedEmail)
     ) {
       setMessage("Email sudah digunakan.");
       return;
@@ -131,10 +123,7 @@ export default function StaffManagementPage() {
       user.id === id
         ? {
             ...user,
-            status:
-              user.status === "active"
-                ? "inactive"
-                : "active",
+            status: user.status === "active" ? "inactive" : "active",
           }
         : user
     );
@@ -143,51 +132,48 @@ export default function StaffManagementPage() {
   };
 
   if (!organizer) {
-    return <p>Memuat Manajemen Petugas...</p>;
+    return (
+      <div className="grid min-h-screen place-items-center bg-[#100b1c] text-white">
+        Memuat Manajemen Petugas...
+      </div>
+    );
   }
 
   return (
-    <main style={{
-      minHeight: "100vh",
-      background: "#100b1c",
-      color: "white",
-      padding: "40px 6%",
-    }}>
-      <Link href="/organizer/dashboard">
+    <main className="min-h-screen bg-[#100b1c] px-[6%] py-10 text-white">
+      <Link
+        href="/organizer/dashboard"
+        className="text-sm text-primary-light hover:text-white"
+      >
         ← Kembali ke Dashboard
       </Link>
 
-      <h1 style={{ marginTop: 25 }}>
+      <h1 className="mt-[25px] font-heading text-3xl font-bold">
         Manajemen Petugas
       </h1>
 
-      <p style={{ color: "#aaa", marginTop: 8 }}>
+      <p className="mt-2 text-[#aaa]">
         Kelola petugas check-in untuk event kamu.
       </p>
 
-      <section style={{
-        background: "#1d1733",
-        padding: 25,
-        borderRadius: 14,
-        marginTop: 30,
-      }}>
-        <h2>Tambah Petugas Baru</h2>
+      <section className="mt-[30px] rounded-[14px] bg-surface-light p-[25px]">
+        <h2 className="font-heading text-xl font-bold">Tambah Petugas Baru</h2>
 
         <form onSubmit={handleAddStaff}>
-          <div style={{ marginTop: 20 }}>
-            <label>Nama Petugas</label>
+          <div className="mt-5">
+            <label className="text-sm font-medium">Nama Petugas</label>
             <input
-              style={inputStyle}
+              className={inputClass}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Nama lengkap"
             />
           </div>
 
-          <div style={{ marginTop: 15 }}>
-            <label>Email</label>
+          <div className="mt-[15px]">
+            <label className="text-sm font-medium">Email</label>
             <input
-              style={inputStyle}
+              className={inputClass}
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -195,10 +181,10 @@ export default function StaffManagementPage() {
             />
           </div>
 
-          <div style={{ marginTop: 15 }}>
-            <label>Password</label>
+          <div className="mt-[15px]">
+            <label className="text-sm font-medium">Password</label>
             <input
-              style={inputStyle}
+              className={inputClass}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -206,25 +192,21 @@ export default function StaffManagementPage() {
             />
           </div>
 
-          <h3 style={{ marginTop: 25 }}>
+          <h3 className="mt-[25px] font-heading text-base font-bold">
             Pilih Event Petugas
           </h3>
 
-          <div style={{ marginTop: 12 }}>
+          <div className="mt-3">
             {concerts.map((event) => (
               <label
                 key={event.id}
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  marginBottom: 12,
-                  alignItems: "center",
-                }}
+                className="mb-3 flex cursor-pointer items-center gap-2.5 text-sm"
               >
                 <input
                   type="checkbox"
                   checked={eventIds.includes(String(event.id))}
                   onChange={() => toggleEvent(String(event.id))}
+                  className="accent-primary"
                 />
                 {event.title}
               </label>
@@ -232,51 +214,45 @@ export default function StaffManagementPage() {
           </div>
 
           {message && (
-            <p style={{ marginTop: 15, color: "#c4a3ff" }}>
-              {message}
-            </p>
+            <p className="mt-[15px] text-sm text-[#c4a3ff]">{message}</p>
           )}
 
-          <button type="submit" style={buttonStyle}>
+          <button type="submit" className={buttonClass}>
             + Tambahkan Petugas
           </button>
         </form>
       </section>
 
-      <section style={{ marginTop: 35 }}>
-        <h2>Daftar Petugas ({staff.length})</h2>
+      <section className="mt-[35px]">
+        <h2 className="font-heading text-xl font-bold">
+          Daftar Petugas ({staff.length})
+        </h2>
 
         {staff.length === 0 ? (
-          <p style={{ color: "#aaa", marginTop: 15 }}>
+          <p className="mt-[15px] text-[#aaa]">
             Belum ada petugas yang ditambahkan.
           </p>
         ) : (
           staff.map((user) => (
             <article
               key={user.id}
-              style={{
-                background: "#1d1733",
-                padding: 20,
-                borderRadius: 12,
-                marginTop: 15,
-              }}
+              className="mt-[15px] rounded-xl bg-surface-light p-5"
             >
-              <h3>{user.name}</h3>
-              <p style={{ color: "#aaa" }}>{user.email}</p>
-              <p style={{ marginTop: 8 }}>
+              <h3 className="font-heading text-lg font-bold">{user.name}</h3>
+              <p className="text-sm text-[#aaa]">{user.email}</p>
+              <p className="mt-2 text-sm">
                 Event ditugaskan: {user.eventIds.length}
               </p>
-              <p>
+              <p className="text-sm">
                 Status: {user.status === "active" ? "Aktif" : "Nonaktif"}
               </p>
 
               <button
-                style={buttonStyle}
+                type="button"
+                className={buttonClass}
                 onClick={() => toggleStatus(user.id)}
               >
-                {user.status === "active"
-                  ? "Nonaktifkan"
-                  : "Aktifkan"}
+                {user.status === "active" ? "Nonaktifkan" : "Aktifkan"}
               </button>
             </article>
           ))
@@ -285,25 +261,3 @@ export default function StaffManagementPage() {
     </main>
   );
 }
-
-const inputStyle = {
-  display: "block",
-  width: "100%",
-  padding: 12,
-  marginTop: 8,
-  borderRadius: 8,
-  border: "1px solid #493c60",
-  background: "#100b1c",
-  color: "white",
-};
-
-const buttonStyle = {
-  marginTop: 20,
-  padding: "12px 20px",
-  borderRadius: 8,
-  border: "none",
-  background: "#8b5cf6",
-  color: "white",
-  fontWeight: "bold",
-  cursor: "pointer",
-};

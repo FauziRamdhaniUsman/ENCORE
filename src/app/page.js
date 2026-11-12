@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -48,8 +47,6 @@ const heroPhotos = [
 
 // ======================================
 // GALLERY PREVIEW
-// HOME MENGGUNAKAN GALERI 1 - 3
-// EXPERIENCE NANTI GALERI 1 - 8
 // ======================================
 
 const galleryPreview = [
@@ -139,7 +136,6 @@ export default function Home() {
 
       {/* ======================================
           01 HERO PHOTO SLIDER
-          TIDAK DIUBAH
       ====================================== */}
 
       <section
@@ -192,7 +188,6 @@ export default function Home() {
 
       {/* ======================================
           02 ABOUT US
-          TIDAK DIUBAH
       ====================================== */}
 
       <section
@@ -209,7 +204,6 @@ export default function Home() {
         <div className="eh-about-overlay" />
 
         <div className="eh-about-content">
-
           <div className="eh-about-heading">
             <h2 id="eh-about-title">ABOUT US</h2>
             <div className="eh-about-line" />
@@ -241,7 +235,6 @@ export default function Home() {
           </div>
 
           <div className="eh-about-values">
-
             <div className="eh-about-value">
               <div className="eh-about-value-icon">
                 <AboutIcon type="innovative" />
@@ -289,14 +282,12 @@ export default function Home() {
                 memenuhi kebutuhan pencinta musik.
               </p>
             </div>
-
           </div>
         </div>
       </section>
 
       {/* ======================================
           03 FEATURED CONCERTS
-          TIDAK DIUBAH
       ====================================== */}
 
       <section
@@ -306,7 +297,6 @@ export default function Home() {
       >
         {featuredConcert && (
           <div className="eh-feature-slider">
-
             <div
               className="eh-feature-content"
               key={featuredConcert.id}
@@ -316,9 +306,7 @@ export default function Home() {
               <div className="eh-feature-overlay" />
 
               <div className="eh-feature-layout">
-
                 <div className="eh-feature-copy">
-
                   <h2 className="eh-feature-title">
                     {featuredConcert.title}
                   </h2>
@@ -379,12 +367,10 @@ export default function Home() {
                     <span>EST. 2026</span>
                   </div>
                 </div>
-
               </div>
             </div>
 
             <div className="eh-feature-navigation">
-
               <div className="eh-feature-arrows">
                 <button
                   type="button"
@@ -402,29 +388,19 @@ export default function Home() {
                   ›
                 </button>
               </div>
-
             </div>
-
           </div>
         )}
       </section>
 
       {/* ======================================
           04 GALLERY PREVIEW
-
-          REVISI TERBARU:
-          - TANPA JUDUL GALLERY
-          - LANGSUNG TIGA FOTO
-          - FOTO TANPA TEKS
-          - NAMA FILE GALERI 1, 2, 3
-          - TOMBOL DI KANAN BAWAH
       ====================================== */}
 
       <section
         className="eh-gallery"
         aria-label="ENCORE Gallery"
       >
-
         <div
           className="eh-gallery-background"
           aria-hidden="true"
@@ -435,10 +411,7 @@ export default function Home() {
           aria-hidden="true"
         />
 
-        {/* LANGSUNG FOTO TANPA HEADING */}
-
         <div className="eh-gallery-grid">
-
           {galleryPreview.map((photo, index) => (
             <Link
               href="/experience"
@@ -456,10 +429,7 @@ export default function Home() {
               />
             </Link>
           ))}
-
         </div>
-
-        {/* EXPLORE FULL GALLERY DI KANAN BAWAH */}
 
         <div className="eh-gallery-bottom">
           <Link
@@ -469,7 +439,6 @@ export default function Home() {
             Explore Full Gallery
           </Link>
         </div>
-
       </section>
 
       {/* FOOTER GLOBAL DARI SITESHELL */}
@@ -518,7 +487,6 @@ export default function Home() {
 
         /* ================================
            HERO PHOTO SLIDER
-           TIDAK DIUBAH
         ================================= */
 
         .eh-hero {
@@ -636,7 +604,6 @@ export default function Home() {
 
         /* ================================
            ABOUT US
-           TIDAK DIUBAH
         ================================= */
 
         .eh-about {
@@ -793,7 +760,6 @@ export default function Home() {
 
         /* ================================
            BUTTONS
-           TIDAK DIUBAH
         ================================= */
 
         .eh-purple-button,
@@ -832,7 +798,6 @@ export default function Home() {
 
         /* ================================
            FEATURED CONCERTS
-           TIDAK DIUBAH
         ================================= */
 
         .eh-featured {
@@ -857,7 +822,7 @@ export default function Home() {
         .eh-feature-backdrop {
           position: absolute;
           inset: 0;
-          background-image: url("/images/BG konser.jpg");
+          background-image: url("/images/bg konser.jpg");
           background-position: center;
           background-size: cover;
           background-repeat: no-repeat;
@@ -1054,9 +1019,6 @@ export default function Home() {
 
         /* ================================
            GALLERY PREVIEW
-
-           TANPA JUDUL
-           LANGSUNG 3 FOTO
         ================================= */
 
         .eh-gallery {
@@ -1068,13 +1030,11 @@ export default function Home() {
           border-top: 1px solid #302747;
         }
 
-        /* BACKGROUND GALERI TETAP */
-
         .eh-gallery-background {
           position: absolute;
           z-index: 0;
           inset: 0;
-          background-image: url("/images/BG galeri.jpg");
+          background-image: url("/images/bg galeri.jpg");
           background-position: center;
           background-size: cover;
           background-repeat: no-repeat;
@@ -1099,8 +1059,6 @@ export default function Home() {
           position: relative;
           z-index: 2;
         }
-
-        /* TIGA FOTO TANPA TEKS */
 
         .eh-gallery-grid {
           display: grid;
@@ -1135,8 +1093,6 @@ export default function Home() {
           transform: scale(1.06);
         }
 
-        /* TOMBOL KANAN BAWAH */
-
         .eh-gallery-bottom {
           display: flex;
           align-items: center;
@@ -1151,7 +1107,6 @@ export default function Home() {
         ================================= */
 
         @media (max-width: 1100px) {
-
           .eh-about-values {
             gap: 20px;
           }
@@ -1173,7 +1128,6 @@ export default function Home() {
           .eh-feature-title {
             font-size: clamp(34px,4.5vw,49px);
           }
-
         }
 
         /* ================================
@@ -1181,7 +1135,6 @@ export default function Home() {
         ================================= */
 
         @media (min-width: 701px) and (max-height: 740px) {
-
           .eh-feature-slider {
             height: 570px;
           }
@@ -1202,7 +1155,6 @@ export default function Home() {
           .eh-feature-price {
             margin-top: 15px;
           }
-
         }
 
         /* ================================
@@ -1210,9 +1162,6 @@ export default function Home() {
         ================================= */
 
         @media (max-width: 700px) {
-
-          /* HERO MOBILE */
-
           .eh-hero {
             height: calc(100svh - 65px);
             min-height: 420px;
@@ -1370,11 +1319,9 @@ export default function Home() {
             padding: 0;
             border: none;
           }
-
         }
 
         @media (prefers-reduced-motion: reduce) {
-
           .eh-hero-photo,
           .eh-feature-content {
             animation: none;
@@ -1383,7 +1330,6 @@ export default function Home() {
           .eh-gallery-item img {
             transition: none;
           }
-
         }
 
       `}</style>

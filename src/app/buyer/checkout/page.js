@@ -26,54 +26,21 @@ function CheckoutContent() {
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
 
-  // Data konser bawaan dan event Organizer
-  const [allConcerts, setAllConcerts] = useState(concerts);
-  const [eventsLoaded, setEventsLoaded] = useState(false);
-
-  // Ambil event dari localStorage
-  useEffect(() => {
-    try {
-      const savedEvents = JSON.parse(
-        localStorage.getItem("encoreCustomConcerts") || "[]"
-      );
-
-      const combinedEvents = [
-        ...concerts,
-        ...savedEvents.filter(
-          (event) =>
-            !concerts.some(
-              (item) => String(item.id) === String(event.id)
-            )
-        ),
-      ];
-
-      setAllConcerts(combinedEvents);
-    } catch (error) {
-      console.error("Gagal membaca event Organizer:", error);
-      setAllConcerts(concerts);
-    } finally {
-      setEventsLoaded(true);
-    }
-  }, []);
-
   const concert = useMemo(
-    () =>
-      allConcerts.find(
-        (item) => String(item.id) === String(concertId)
-      ),
-    [allConcerts, concertId]
+    () => concerts.find(
+      (item) => String(item.id) === String(concertId)
+    ),
+    [concertId]
   );
 
   const tickets = concert?.tickets?.length
     ? concert.tickets
     : concert
-      ? [
-          {
-            name: "Regular",
-            description: "General admission",
-            price: concert.price,
-          },
-        ]
+      ? [{
+          name: "Regular",
+          description: "General admission",
+          price: concert.price,
+        }]
       : [];
 
   const selectedTicket = tickets[ticketIndex] || tickets[0];
@@ -84,10 +51,6 @@ function CheckoutContent() {
 
   const serviceFee = Math.round(subtotal * 0.05);
   const total = subtotal + serviceFee;
-
-  // ======================================
-  // CEK LOGIN BUYER
-  // ======================================
 
   useEffect(() => {
     try {
@@ -120,10 +83,6 @@ function CheckoutContent() {
     }
   }, [router]);
 
-  // ======================================
-  // DATA SAMA DENGAN AKUN
-  // ======================================
-
   const handleSameAsAccount = (checked) => {
     setSameAsAccount(checked);
 
@@ -139,10 +98,6 @@ function CheckoutContent() {
       setPhone("");
     }
   };
-
-  // ======================================
-  // SIMPAN PESANAN
-  // ======================================
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -168,7 +123,7 @@ function CheckoutContent() {
       return;
     }
 
-    // Simpan data event dan pemilik event
+    // DATA PESANAN
     const order = {
       id: `ENC-${Date.now()}`,
       userId: user?.id || null,
@@ -179,16 +134,16 @@ function CheckoutContent() {
 
       concertId: concert.id,
       concertTitle: concert.title,
+      concertImage: concert.image,
       concertDate: concert.date,
       concertLocation: concert.location,
 
-      // Informasi Organizer pemilik event
-      organizerId: concert.organizerId || null,
-      organizer: concert.organizer || null,
-
       ticketName: selectedTicket.name,
       ticketPrice: selectedTicket.price,
+
       ticketQuantity: quantity,
+      quantity: quantity,
+
       personsPerPackage: selectedTicket.persons || 1,
       totalPersons: (selectedTicket.persons || 1) * quantity,
 
@@ -212,21 +167,13 @@ function CheckoutContent() {
     }
   };
 
-  // ======================================
-  // LOADING
-  // ======================================
-
-  if (loading || !eventsLoaded) {
+  if (loading) {
     return (
       <main className="encore-checkout">
         <p className="checkout-loading">Memuat checkout...</p>
       </main>
     );
   }
-
-  // ======================================
-  // DATA KONSER TIDAK DITEMUKAN
-  // ======================================
 
   if (!concert || !selectedTicket) {
     return (
@@ -245,7 +192,6 @@ function CheckoutContent() {
   return (
     <main className="encore-checkout">
       <div className="checkout-container">
-
         <Link
           href={`/concerts/${concert.id}`}
           className="checkout-back"
@@ -262,14 +208,8 @@ function CheckoutContent() {
           </p>
         </header>
 
-        <form
-          className="checkout-layout"
-          onSubmit={handleSubmit}
-        >
-
-          {/* FORM DATA PEMESAN */}
+        <form className="checkout-layout" onSubmit={handleSubmit}>
           <section className="checkout-form-card">
-
             <div className="checkout-section-title">
               <div>
                 <span>01</span>
@@ -297,11 +237,8 @@ function CheckoutContent() {
             </div>
 
             <div className="checkout-fields">
-
               <div className="checkout-field">
-                <label htmlFor="buyer-name">
-                  Nama Lengkap
-                </label>
+                <label htmlFor="buyer-name">Nama Lengkap</label>
                 <input
                   id="buyer-name"
                   type="text"
@@ -313,15 +250,9 @@ function CheckoutContent() {
               </div>
 
               <div className="checkout-field">
-                <label htmlFor="buyer-phone">
-                  Nomor HP
-                </label>
-
+                <label htmlFor="buyer-phone">Nomor HP</label>
                 <div className="phone-input">
-                  <span className="phone-code">
-                    🇮🇩 +62
-                  </span>
-
+                  <span className="phone-code">🇮🇩 +62</span>
                   <input
                     id="buyer-phone"
                     type="tel"
@@ -334,10 +265,7 @@ function CheckoutContent() {
               </div>
 
               <div className="checkout-field">
-                <label htmlFor="buyer-email">
-                  Email
-                </label>
-
+                <label htmlFor="buyer-email">Email</label>
                 <input
                   id="buyer-email"
                   type="email"
@@ -346,13 +274,11 @@ function CheckoutContent() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
-
                 <small>
                   E-ticket dan informasi pesanan akan
                   dikirim ke email ini.
                 </small>
               </div>
-
             </div>
 
             {error && (
@@ -360,12 +286,9 @@ function CheckoutContent() {
                 {error}
               </p>
             )}
-
           </section>
 
-          {/* RINGKASAN PESANAN */}
           <aside className="checkout-summary">
-
             <div className="summary-event">
               <img
                 src={concert.image || "/images/default-concert.jpg"}
@@ -374,7 +297,6 @@ function CheckoutContent() {
 
               <div className="summary-event-info">
                 <h3>{concert.title}</h3>
-
                 <button
                   type="button"
                   onClick={() =>
@@ -403,24 +325,21 @@ function CheckoutContent() {
             <div className="summary-divider" />
 
             <div className="summary-date">
-              <span>Selected Date</span>
+              <span>Tanggal Konser</span>
               <strong>{concert.date}</strong>
             </div>
 
             <div className="summary-divider" />
 
             <div className="summary-benefits">
-
               <div>
                 <span>🚫</span>
                 <p>Refund not allowed</p>
               </div>
-
               <div>
                 <span>⚡</span>
                 <p>Instant Confirmation</p>
               </div>
-
               <div>
                 <span>💺</span>
                 <p>
@@ -431,17 +350,14 @@ function CheckoutContent() {
                   </small>
                 </p>
               </div>
-
               <div>
                 <span>⌛</span>
                 <p>
                   Valid on <strong>{concert.date}</strong>
                 </p>
               </div>
-
             </div>
 
-            {/* TOTAL PAYMENT */}
             <div className="summary-payment">
               <details>
                 <summary>
@@ -451,66 +367,50 @@ function CheckoutContent() {
                 </summary>
 
                 <div className="summary-payment-detail">
-
                   <div>
                     <span>Harga Tiket</span>
                     <strong>
                       {formatPrice(selectedTicket.price)}
                     </strong>
                   </div>
-
                   <div>
                     <span>Jumlah</span>
                     <strong>{quantity}</strong>
                   </div>
-
                   <div>
                     <span>Subtotal</span>
                     <strong>{formatPrice(subtotal)}</strong>
                   </div>
-
                   <div>
                     <span>Biaya Layanan</span>
                     <strong>{formatPrice(serviceFee)}</strong>
                   </div>
-
                   <div className="summary-final-total">
                     <span>Total</span>
                     <strong>{formatPrice(total)}</strong>
                   </div>
-
                 </div>
               </details>
             </div>
 
-            <button
-              type="submit"
-              className="checkout-submit"
-            >
+            <button type="submit" className="checkout-submit">
               Lanjutkan ke Pembayaran →
             </button>
 
             <p className="checkout-secure">
               🔒 Transaksi simulasi ENCORE
             </p>
-
           </aside>
-
         </form>
       </div>
 
-      <style>{`
-
+      <style jsx>{`
         .encore-checkout {
           min-height: 100vh;
           padding: 45px 6%;
           color: #fff;
           background:
-            linear-gradient(
-              180deg,
-              rgba(9,7,20,.82),
-              rgba(9,7,20,.97)
-            ),
+            linear-gradient(180deg, rgba(9,7,20,.82), rgba(9,7,20,.97)),
             url("/images/bg%20konser.jpg") center top / cover fixed;
         }
 
@@ -541,7 +441,8 @@ function CheckoutContent() {
           font-size: clamp(28px, 4vw, 38px);
         }
 
-        .checkout-heading p {
+        .checkout-heading p,
+        .checkout-section-title p {
           color: #aaa1bd;
           font-size: 14px;
           line-height: 1.7;
@@ -549,9 +450,7 @@ function CheckoutContent() {
 
         .checkout-layout {
           display: grid;
-          grid-template-columns:
-            minmax(0, 1.55fr)
-            minmax(320px, .85fr);
+          grid-template-columns: minmax(0, 1.55fr) minmax(320px, .85fr);
           align-items: start;
           gap: 24px;
         }
@@ -592,7 +491,6 @@ function CheckoutContent() {
 
         .checkout-section-title p {
           margin: 9px 0 0 48px;
-          color: #aaa1bd;
           font-size: 12px;
         }
 
@@ -717,8 +615,6 @@ function CheckoutContent() {
           border-color: #a78bfa;
         }
 
-        /* RINGKASAN PESANAN */
-
         .summary-event {
           display: flex;
           align-items: center;
@@ -830,8 +726,6 @@ function CheckoutContent() {
           line-height: 1.6;
         }
 
-        /* TOTAL PAYMENT */
-
         .summary-payment {
           margin: 20px -27px 0;
           padding: 18px 27px;
@@ -905,15 +799,13 @@ function CheckoutContent() {
           color: #c4b5fd;
         }
 
-        /* BUTTON */
-
         .checkout-submit {
           width: 100%;
           min-height: 50px;
           margin-top: 20px;
           border: none;
           border-radius: 10px;
-          background: linear-gradient(100deg,#7c3aed,#a855f7);
+          background: linear-gradient(100deg, #7c3aed, #a855f7);
           color: white;
           font-size: 13px;
           font-weight: 750;
@@ -986,7 +878,6 @@ function CheckoutContent() {
             padding-left: 21px;
           }
         }
-
       `}</style>
     </main>
   );

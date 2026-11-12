@@ -114,25 +114,6 @@ h4 {
   color: var(--text);
 }
 
-.logo,
-.auth-logo {
-  font-family: "Outfit", sans-serif;
-  font-size: 27px;
-  font-weight: 800;
-  letter-spacing: -1px;
-  white-space: nowrap;
-}
-
-.navbar .logo,
-.auth-logo {
-  color: #f8fafc;
-}
-
-.logo span,
-.auth-logo span {
-  color: var(--primary-light);
-}
-
 .nav-links {
   display: flex;
   align-items: center;
@@ -1548,9 +1529,6 @@ h4 {
     gap: 15px;
   }
 
-  .logo {
-    font-size: 24px;
-  }
 
   .nav-links {
     order: 3;
@@ -2133,43 +2111,6 @@ h4 {
 /* =========================================
    ENCORE BUYER ACCOUNT DROPDOWN
 ========================================= */
-
-.buyer-account {
-  position: relative;
-  z-index: 120;
-}
-
-.buyer-account-trigger {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 12px;
-  border: 1px solid #40304f;
-  border-radius: 30px;
-  background: #1b1228;
-  color: #fff;
-  cursor: pointer;
-}
-
-.buyer-account-avatar,
-.buyer-dropdown-avatar {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #9b5cf6, #6739a0);
-  color: #fff;
-  font-weight: 800;
-}
-
-.buyer-account-name {
-  max-width: 110px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 .buyer-chevron {
   transition: transform 0.2s ease;

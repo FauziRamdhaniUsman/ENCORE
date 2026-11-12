@@ -1,4 +1,3 @@
-
 .encore-experience-page {
   position: relative;
   isolation: isolate;
@@ -18,7 +17,7 @@
   position: absolute;
   inset: 0;
   z-index: -2;
-  background-image: url("/images/BG galeri.jpg");
+  background-image: url("/images/bg galeri.jpg");
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;

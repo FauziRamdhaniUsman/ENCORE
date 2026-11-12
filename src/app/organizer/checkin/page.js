@@ -1,10 +1,12 @@
-
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function CheckinPage() {
+  const router = useRouter();
+
   const scannerRef = useRef(null);
   const processingRef = useRef(false);
 
@@ -14,10 +16,41 @@ export default function CheckinPage() {
   const [loading, setLoading] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [ready, setReady] = useState(false);
+  const [accessAllowed, setAccessAllowed] = useState(false);
 
+  // MEMERIKSA LOGIN DAN ROLE PENGGUNA
   useEffect(() => {
-    setReady(true);
+    try {
+      const currentUser = JSON.parse(
+        localStorage.getItem("encoreCurrentUser") || "null"
+      );
 
+      if (!currentUser) {
+        router.replace("/login?redirect=/organizer/checkin");
+        return;
+      }
+
+      const allowedRoles = ["admin", "organizer", "checkin"];
+
+      if (!allowedRoles.includes(currentUser.role)) {
+        if (currentUser.role === "buyer") {
+          router.replace("/buyer/dashboard");
+        } else {
+          router.replace("/login");
+        }
+        return;
+      }
+
+      setAccessAllowed(true);
+      setReady(true);
+    } catch (error) {
+      localStorage.removeItem("encoreCurrentUser");
+      router.replace("/login");
+    }
+  }, [router]);
+
+  // MEMBERSIHKAN SCANNER SAAT KELUAR HALAMAN
+  useEffect(() => {
     return () => {
       const scanner = scannerRef.current;
 
@@ -181,8 +214,12 @@ export default function CheckinPage() {
     validateTicket(code);
   }
 
-  if (!ready) {
-    return <div className="checkin-loading">Memuat ENCORE...</div>;
+  if (!ready || !accessAllowed) {
+    return (
+      <div className="checkin-loading">
+        Memeriksa akses ENCORE...
+      </div>
+    );
   }
 
   return (
@@ -223,7 +260,9 @@ export default function CheckinPage() {
               <div className="checkin-camera-placeholder">
                 <span>▦</span>
                 <p>Kamera scanner belum aktif</p>
-                <small>Tekan tombol di bawah untuk memulai scan.</small>
+                <small>
+                  Tekan tombol di bawah untuk memulai scan.
+                </small>
               </div>
             )}
           </div>
@@ -272,7 +311,10 @@ export default function CheckinPage() {
               onChange={(event) => setCode(event.target.value)}
             />
 
-            <button type="submit" className="checkin-submit-button">
+            <button
+              type="submit"
+              className="checkin-submit-button"
+            >
               Validasi Tiket
             </button>
           </form>
@@ -320,7 +362,11 @@ export default function CheckinPage() {
                   <div>
                     <span>Jumlah Tiket</span>
                     <strong>
-                      {result.ticket.quantity || 1} tiket
+                      {result.ticket.ticketQuantity ||
+                        result.ticket.quantity ||
+                        result.ticket.totalPersons ||
+                        1}{" "}
+                      tiket
                     </strong>
                   </div>
                 </div>
@@ -334,9 +380,15 @@ export default function CheckinPage() {
           <ol>
             <li>Aktifkan kamera scanner.</li>
             <li>Pindai QR Code pada e-ticket pengunjung.</li>
-            <li>Tunggu sistem memeriksa pembayaran dan status tiket.</li>
-            <li>Jika valid, sistem otomatis mencatat check-in.</li>
-            <li>Tiket yang sudah digunakan tidak bisa check-in lagi.</li>
+            <li>
+              Tunggu sistem memeriksa pembayaran dan status tiket.
+            </li>
+            <li>
+              Jika valid, sistem otomatis mencatat check-in.
+            </li>
+            <li>
+              Tiket yang sudah digunakan tidak bisa check-in lagi.
+            </li>
           </ol>
         </div>
 

@@ -64,7 +64,9 @@ export default function PaymentPage() {
 
       if (!pendingOrder) {
         setLoading(false);
-        setError("Pesanan tidak ditemukan. Silakan lakukan checkout kembali.");
+        setError(
+          "Pesanan tidak ditemukan. Silakan lakukan checkout kembali."
+        );
         return;
       }
 
@@ -136,7 +138,10 @@ export default function PaymentPage() {
   if (loading) {
     return (
       <main className="encore-payment">
-        <p className="payment-loading">Memuat pembayaran...</p>
+        <p className="payment-loading">
+          Memuat pembayaran...
+        </p>
+        <PaymentStyles />
       </main>
     );
   }
@@ -181,7 +186,9 @@ export default function PaymentPage() {
 
               <div>
                 <span>Jumlah</span>
-                <strong>{order.ticketQuantity} tiket/paket</strong>
+                <strong>
+                  {order.ticketQuantity} tiket/paket
+                </strong>
               </div>
 
               <div>
@@ -195,12 +202,13 @@ export default function PaymentPage() {
               </div>
             </div>
 
-            <Link
-              href="/buyer/dashboard"
+            <button
+              type="button"
               className="payment-primary-button"
+              onClick={() => router.replace("/")}
             >
-              Kembali ke Dashboard
-            </Link>
+              Kembali ke Home
+            </button>
 
             <p className="payment-note">
               Ini merupakan simulasi pembayaran. Tidak ada
@@ -221,7 +229,11 @@ export default function PaymentPage() {
           <div className="payment-error-card">
             <h2>Pesanan Tidak Tersedia</h2>
             <p>{error}</p>
-            <Link href="/concerts" className="payment-primary-button">
+
+            <Link
+              href="/concerts"
+              className="payment-primary-button"
+            >
               Cari Konser
             </Link>
           </div>
@@ -235,7 +247,6 @@ export default function PaymentPage() {
   return (
     <main className="encore-payment">
       <div className="payment-container">
-
         <Link
           href="/buyer/checkout"
           className="payment-back"
@@ -261,7 +272,6 @@ export default function PaymentPage() {
         </header>
 
         <div className="payment-layout">
-
           <section className="payment-method-card">
             <div className="payment-section-heading">
               <span>01</span>
@@ -382,7 +392,6 @@ export default function PaymentPage() {
               🔒 Pembayaran simulasi ENCORE
             </p>
           </aside>
-
         </div>
       </div>
 

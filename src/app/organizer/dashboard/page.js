@@ -1,12 +1,15 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function OrganizerDashboard() {
+  const router = useRouter();
+
   const [orders, setOrders] = useState([]);
   const [organizerName, setOrganizerName] = useState("Organizer");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     try {
@@ -14,38 +17,159 @@ export default function OrganizerDashboard() {
         localStorage.getItem("encoreCurrentUser") || "null"
       );
 
-      if (user) {
-        setOrganizerName(
-          user.organization || user.name || "Organizer"
-        );
+      if (!user || user.role !== "organizer") {
+        router.replace("/login");
+        return;
       }
+
+      const currentOrganizerId = String(user.id);
+      const currentOrganizerEmail = String(
+        user.email || ""
+      ).toLowerCase();
+
+      const currentOrganizerName = String(
+        user.organization || user.name || ""
+      ).toLowerCase();
+
+      setOrganizerName(
+        user.organization || user.name || "Organizer"
+      );
 
       const savedOrders = JSON.parse(
         localStorage.getItem("encoreOrders") || "[]"
       );
 
-      setOrders(
-        Array.isArray(savedOrders)
-          ? savedOrders.filter(
-              (order) => order.status === "paid"
-            )
-          : []
+      const savedEvents = JSON.parse(
+        localStorage.getItem("encoreCustomConcerts") || "[]"
       );
+
+      const myEventIds = Array.isArray(savedEvents)
+        ? savedEvents
+            .filter((event) => {
+              const eventOrganizerId =
+                event.organizerId ??
+                event.createdBy ??
+                event.userId;
+
+              return (
+                eventOrganizerId != null &&
+                String(eventOrganizerId) === currentOrganizerId
+              );
+            })
+            .map((event) => String(event.id))
+        : [];
+
+      const myEventNames = Array.isArray(savedEvents)
+        ? savedEvents
+            .filter((event) => {
+              const eventOrganizerId =
+                event.organizerId ??
+                event.createdBy ??
+                event.userId;
+
+              return (
+                eventOrganizerId != null &&
+                String(eventOrganizerId) === currentOrganizerId
+              );
+            })
+            .map((event) =>
+              String(event.title || event.name || "").toLowerCase()
+            )
+        : [];
+
+      const myOrders = Array.isArray(savedOrders)
+        ? savedOrders.filter((order) => {
+            if (order.status !== "paid") {
+              return false;
+            }
+
+            const orderOrganizerId =
+              order.organizerId ??
+              order.createdBy ??
+              order.userIdOrganizer;
+
+            const orderOrganizerEmail = String(
+              order.organizerEmail || ""
+            ).toLowerCase();
+
+            const organizerValue =
+              typeof order.organizer === "string"
+                ? order.organizer
+                : order.organizer?.name ||
+                  order.organizer?.organization ||
+                  "";
+
+            const orderOrganizerName =
+              String(organizerValue).toLowerCase();
+
+            const orderEventId = String(
+              order.concertId ?? order.eventId ?? ""
+            );
+
+            const orderEventName = String(
+              order.concertTitle || order.eventName || ""
+            ).toLowerCase();
+
+            // Prioritaskan pencocokan berdasarkan ID Organizer.
+            if (orderOrganizerId != null) {
+              return (
+                String(orderOrganizerId) === currentOrganizerId
+              );
+            }
+
+            // Jika ID Organizer tidak tersedia,
+            // cocokkan dengan email Organizer.
+            if (orderOrganizerEmail) {
+              return (
+                orderOrganizerEmail === currentOrganizerEmail
+              );
+            }
+
+            // Gunakan nama event milik Organizer sebagai cadangan.
+            if (orderEventId && myEventIds.includes(orderEventId)) {
+              return true;
+            }
+
+            if (
+              orderEventName &&
+              myEventNames.includes(orderEventName)
+            ) {
+              return true;
+            }
+
+            // Cadangan untuk transaksi lama yang menyimpan nama Organizer.
+            if (orderOrganizerName && currentOrganizerName) {
+              return orderOrganizerName === currentOrganizerName;
+            }
+
+            return false;
+          })
+        : [];
+
+      setOrders(myOrders);
     } catch (error) {
       console.error("Gagal membaca transaksi:", error);
       setOrders([]);
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  }, [router]);
+
+  const getQuantity = (order) =>
+    Number(
+      order.ticketQuantity ??
+      order.quantity ??
+      order.totalPersons ??
+      1
+    );
 
   const totalTickets = orders.reduce(
-    (total, order) =>
-      total + Number(order.ticketQuantity || 0),
+    (total, order) => total + getQuantity(order),
     0
   );
 
   const totalRevenue = orders.reduce(
-    (total, order) =>
-      total + Number(order.total || 0),
+    (total, order) => total + Number(order.total || 0),
     0
   );
 
@@ -53,12 +177,15 @@ export default function OrganizerDashboard() {
     (total, order) =>
       total +
       (order.checkInStatus === "checked_in"
-        ? Number(order.ticketQuantity || 0)
+        ? getQuantity(order)
         : 0),
     0
   );
 
-  const pendingCheckIn = totalTickets - checkedInTickets;
+  const pendingCheckIn = Math.max(
+    0,
+    totalTickets - checkedInTickets
+  );
 
   const formatPrice = (price) =>
     new Intl.NumberFormat("id-ID", {
@@ -67,10 +194,12 @@ export default function OrganizerDashboard() {
       maximumFractionDigits: 0,
     }).format(price);
 
-  // Mengelompokkan transaksi berdasarkan nama konser
   const eventReports = Object.values(
     orders.reduce((groups, order) => {
-      const eventName = order.concertTitle || "Event Tanpa Nama";
+      const eventName =
+        order.concertTitle ||
+        order.eventName ||
+        "Event Tanpa Nama";
 
       if (!groups[eventName]) {
         groups[eventName] = {
@@ -82,7 +211,7 @@ export default function OrganizerDashboard() {
         };
       }
 
-      const quantity = Number(order.ticketQuantity || 0);
+      const quantity = getQuantity(order);
 
       groups[eventName].orders += 1;
       groups[eventName].tickets += quantity;
@@ -96,6 +225,24 @@ export default function OrganizerDashboard() {
     }, {})
   );
 
+  if (loading) {
+    return (
+      <div className="loading">
+        Memuat Dashboard ENCORE...
+        <style>{`
+          .loading {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: #10091b;
+            color: white;
+            font-family: Arial, sans-serif;
+          }
+        `}</style>
+      </div>
+    );
+  }
+
   return (
     <main className="dashboard">
       <header className="header">
@@ -106,11 +253,17 @@ export default function OrganizerDashboard() {
         </div>
 
         <div className="header-actions">
-          <Link href="/organizer/events" className="event-button">
+          <Link
+            href="/organizer/events"
+            className="event-button"
+          >
             Manajemen Event
           </Link>
 
-          <Link href="/organizer/checkin" className="checkin">
+          <Link
+            href="/organizer/checkin"
+            className="checkin"
+          >
             Scan Tiket →
           </Link>
         </div>
@@ -147,13 +300,15 @@ export default function OrganizerDashboard() {
         <div className="section-heading">
           <div>
             <h2>Laporan Penjualan per Event</h2>
-            <p>Ringkasan performa penjualan setiap konser.</p>
+            <p>
+              Ringkasan performa penjualan event milikmu.
+            </p>
           </div>
         </div>
 
         {eventReports.length === 0 ? (
           <div className="empty">
-            Belum ada data penjualan event.
+            Belum ada data penjualan event milikmu.
           </div>
         ) : (
           <div className="table-wrapper">
@@ -196,7 +351,9 @@ export default function OrganizerDashboard() {
 
       <section className="content">
         <h2>Riwayat Penjualan</h2>
-        <p>Daftar transaksi tiket yang berhasil dibayar.</p>
+        <p>
+          Daftar transaksi tiket event milikmu yang berhasil dibayar.
+        </p>
 
         {orders.length === 0 ? (
           <div className="empty">
@@ -219,14 +376,18 @@ export default function OrganizerDashboard() {
               <tbody>
                 {orders.map((order, index) => (
                   <tr
-                    key={`${order.id || order.ticketCode || "order"}-${index}`}
+                    key={`${
+                      order.id || order.ticketCode || "order"
+                    }-${index}`}
                   >
                     <td>{order.buyerName || "-"}</td>
                     <td>{order.buyerEmail || "-"}</td>
-                    <td>{order.concertTitle || "-"}</td>
                     <td>
-                      {Number(order.ticketQuantity || 0)}
+                      {order.concertTitle ||
+                        order.eventName ||
+                        "-"}
                     </td>
+                    <td>{getQuantity(order)}</td>
                     <td>
                       {formatPrice(Number(order.total || 0))}
                     </td>

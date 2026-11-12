@@ -4,6 +4,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { auth } from "../../components/auth-styles";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -48,75 +49,62 @@ export default function LoginPage() {
     const normalizedEmail = email.trim().toLowerCase();
     const redirectPath = getRedirectPath();
 
-    // AKUN DEMO BUYER
-    if (
-      normalizedEmail === "demo@encore.com" &&
-      password === "encore123"
-    ) {
-      const demoUser = {
-        name: "Demo Buyer",
-        email: "demo@encore.com",
-        role: "buyer",
-        status: "active",
-      };
+    try {
+      let user = null;
 
-      localStorage.setItem(
-        "encoreCurrentUser",
-        JSON.stringify(demoUser)
-      );
-
-      router.push(redirectPath || "/buyer/dashboard");
-      return;
-    }
-
-    // AKUN DEMO ADMIN
-    if (
-      normalizedEmail === "admin@encore.com" &&
-      password === "admin123"
-    ) {
-      const adminUser = {
-        id: "admin-encore",
-        name: "ENCORE Admin",
-        email: "admin@encore.com",
-        role: "admin",
-        status: "active",
-      };
-
-      localStorage.setItem(
-        "encoreCurrentUser",
-        JSON.stringify(adminUser)
-      );
-
-      if (remember) {
-        localStorage.setItem(
-          "encoreRememberEmail",
-          normalizedEmail
-        );
-      } else {
-        localStorage.removeItem("encoreRememberEmail");
+      // DEMO BUYER
+      if (
+        normalizedEmail === "demo@encore.com" &&
+        password === "encore123"
+      ) {
+        user = {
+          id: "demo-buyer",
+          name: "Demo Buyer",
+          email: normalizedEmail,
+          role: "buyer",
+          status: "active",
+        };
       }
 
-      router.push("/admin/dashboard");
-      return;
-    }
+      // DEMO ADMIN
+      else if (
+        normalizedEmail === "admin@encore.com" &&
+        password === "admin123"
+      ) {
+        user = {
+          id: "admin-encore",
+          name: "ENCORE Admin",
+          email: normalizedEmail,
+          role: "admin",
+          status: "active",
+        };
+      }
 
-    // CEK AKUN HASIL REGISTER
-    try {
-      const users = JSON.parse(
-        localStorage.getItem("encoreUsers") || "[]"
-      );
+      // AKUN REGISTER DAN PETUGAS
+      else {
+        const users = JSON.parse(
+          localStorage.getItem("encoreUsers") || "[]"
+        );
 
-      const user = users.find(
-        (item) =>
-          item.email.toLowerCase() === normalizedEmail &&
-          item.password === password
-      );
+        if (!Array.isArray(users)) {
+          setError("Data pengguna tidak valid.");
+          return;
+        }
 
+        user = users.find(
+          (item) =>
+            item.email?.toLowerCase() === normalizedEmail &&
+            item.password === password
+        );
+      }
+
+      // CEK AKUN
       if (!user) {
         setError("Email atau password salah.");
         return;
       }
 
+      // CEK STATUS ORGANIZER
       if (
         user.role === "organizer" &&
         user.status !== "active"
@@ -129,12 +117,41 @@ export default function LoginPage() {
         return;
       }
 
+      // CEK STATUS PETUGAS
+      if (
+        user.role === "checkin" &&
+        user.status !== "active"
+      ) {
+        setError(
+          "Akun Petugas Check-in kamu belum aktif atau sudah dinonaktifkan."
+        );
+        return;
+      }
+
+      // CEK ROLE
+      const allowedRoles = [
+        "buyer",
+        "organizer",
+        "checkin",
+        "admin",
+      ];
+
+      if (!allowedRoles.includes(user.role)) {
+        setError("Role akun tidak dikenali.");
+        return;
+      }
+
+      // SIMPAN SESSION SIMULASI
       const currentUser = {
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
         organization: user.organization || "",
+        organizerId: user.organizerId || "",
+        eventIds: Array.isArray(user.eventIds)
+          ? user.eventIds
+          : [],
         status: user.status,
       };
 
@@ -143,6 +160,7 @@ export default function LoginPage() {
         JSON.stringify(currentUser)
       );
 
+      // INGAT EMAIL
       if (remember) {
         localStorage.setItem(
           "encoreRememberEmail",
@@ -152,38 +170,56 @@ export default function LoginPage() {
         localStorage.removeItem("encoreRememberEmail");
       }
 
-      if (user.role === "organizer") {
-        router.push("/organizer/dashboard");
-      } else if (user.role === "buyer") {
-        router.push(redirectPath || "/buyer/dashboard");
-      } else {
-        setError("Role akun tidak dikenali.");
+      // REDIRECT BERDASARKAN ROLE
+      switch (user.role) {
+        case "admin":
+          router.push("/admin/dashboard");
+          break;
+
+        case "organizer":
+          router.push("/organizer/dashboard");
+          break;
+
+        case "checkin":
+          router.push("/organizer/checkin");
+          break;
+
+        case "buyer":
+          router.push(
+            redirectPath || "/buyer/dashboard"
+          );
+          break;
+
+        default:
+          setError("Role akun tidak dikenali.");
       }
     } catch (err) {
+      console.error("Login error:", err);
       setError("Terjadi kesalahan. Silakan coba kembali.");
     }
   };
 
-  return (
-    <main className="auth-page">
-      <Link href="/" className="auth-logo">
-        EN<span>CORE</span>
+    return (
+    <main className={auth.page}>
+      <Link href="/" className={auth.logo}>
+        EN<span className={auth.logoAccent}>CORE</span>
       </Link>
 
-      <div className="auth-card">
-        <div className="auth-heading">
-          <span className="eyebrow">WELCOME BACK</span>
+      <div className={auth.card}>
+        <div className={auth.heading}>
+          <span className={auth.eyebrow}>WELCOME BACK</span>
 
-          <h1>Selamat Datang Kembali</h1>
+          <h1 className={auth.title}>Selamat Datang Kembali</h1>
 
-          <p>
-            Masuk ke akun ENCORE untuk melanjutkan
-            pengalaman konsermu.
+          <p className={auth.subtitle}>
+            Masuk ke akun ENCORE untuk melanjutkan pengalaman konsermu.
           </p>
         </div>
 
-        <form className="auth-form" onSubmit={handleLogin}>
-          <label htmlFor="email">Email</label>
+        <form className={auth.form} onSubmit={handleLogin}>
+          <label htmlFor="email" className={auth.label}>
+            Email
+          </label>
 
           <input
             id="email"
@@ -192,11 +228,14 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
+            className={auth.input}
           />
 
-          <label htmlFor="password">Password</label>
+          <label htmlFor="password" className={auth.label}>
+            Password
+          </label>
 
-          <div className="password-field">
+          <div className={auth.passwordWrap}>
             <input
               id="password"
               type={showPassword ? "text" : "password"}
@@ -204,51 +243,54 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
+              className={auth.passwordInput}
             />
 
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
+              className={auth.passwordToggle}
             >
               {showPassword ? "Sembunyikan" : "Lihat"}
             </button>
           </div>
 
-          <div className="auth-extra">
-            <label className="remember-label">
+          <div className={auth.extra}>
+            <label className={auth.remember}>
               <input
                 type="checkbox"
                 checked={remember}
                 onChange={(e) => setRemember(e.target.checked)}
+                className={auth.checkbox}
               />
               Ingat saya
             </label>
 
-            <Link href="/forgot-password">
+            <Link href="/forgot-password" className={auth.link}>
               Lupa password?
             </Link>
           </div>
 
           {error && (
-            <p className="auth-error" role="alert">
+            <p className={auth.error} role="alert">
               {error}
             </p>
           )}
 
-          <button type="submit" className="auth-submit">
+          <button type="submit" className={auth.submit}>
             Masuk
           </button>
         </form>
 
-        <p className="auth-switch">
+        <p className={auth.switchText}>
           Belum punya akun?{" "}
-          <Link href="/register">Daftar sekarang</Link>
+          <Link href="/register" className={auth.switchLink}>
+            Daftar sekarang
+          </Link>
         </p>
       </div>
 
-      <p className="auth-footer">
-        © 2026 ENCORE. All rights reserved.
-      </p>
+      <p className={auth.footer}>© 2026 ENCORE. All rights reserved.</p>
     </main>
   );
 }

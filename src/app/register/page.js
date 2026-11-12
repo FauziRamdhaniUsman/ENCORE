@@ -95,71 +95,76 @@ export default function RegisterPage() {
     }
   };
 
+    const roleCard = (value) =>
+    `${auth.roleCard} ${
+      role === value ? auth.roleCardSelected : auth.roleCardIdle
+    }`;
+
   return (
-    <main className="auth-page">
-      <Link href="/" className="auth-logo">
-        EN<span>CORE</span>
+    <main className={auth.page}>
+      <Link href="/" className={auth.logo}>
+        EN<span className={auth.logoAccent}>CORE</span>
       </Link>
 
-      <div className="auth-card">
-        <div className="auth-heading">
-          <span className="eyebrow">JOIN THE EXPERIENCE</span>
+      <div className={auth.card}>
+        <div className={auth.heading}>
+          <span className={auth.eyebrow}>JOIN THE EXPERIENCE</span>
 
-          <h1>Buat Akun ENCORE</h1>
+          <h1 className={auth.title}>Buat Akun ENCORE</h1>
 
-          <p>
-            Bergabung dan nikmati pengalaman konser
-            yang lebih mudah bersama ENCORE.
+          <p className={auth.subtitle}>
+            Bergabung dan nikmati pengalaman konser yang lebih mudah
+            bersama ENCORE.
           </p>
         </div>
 
-        <div className="register-role-heading">
-          <label>Pilih Jenis Akun</label>
-          <p>Daftar sebagai siapa?</p>
+        <div className={auth.roleHeading}>
+          <label className={auth.roleLabel}>Pilih Jenis Akun</label>
+          <p className={auth.roleHint}>Daftar sebagai siapa?</p>
         </div>
 
-        <div className="register-role-options">
+        <div className={auth.roleGrid}>
           <button
             type="button"
-            className={`register-role-card ${
-              role === "buyer" ? "selected" : ""
-            }`}
+            className={roleCard("buyer")}
             onClick={() => {
               setRole("buyer");
               setError("");
             }}
             aria-pressed={role === "buyer"}
           >
-            <span className="register-role-icon">🎟️</span>
-            <strong>Buyer</strong>
-            <small>Ingin membeli tiket konser</small>
-            <span className="register-role-check">
+            <span className={auth.roleIcon}>🎟️</span>
+            <strong className={auth.roleName}>Buyer</strong>
+            <small className={auth.roleDesc}>Ingin membeli tiket konser</small>
+            <span className={auth.roleCheck}>
               {role === "buyer" ? "✓" : ""}
             </span>
           </button>
 
           <button
             type="button"
-            className={`register-role-card ${
-              role === "organizer" ? "selected" : ""
-            }`}
+            className={roleCard("organizer")}
             onClick={() => {
               setRole("organizer");
               setError("");
             }}
             aria-pressed={role === "organizer"}
           >
-            <span className="register-role-icon">🎤</span>
-            <strong>Organizer</strong>
-            <small>Ingin menyelenggarakan konser</small>
-            <span className="register-role-check">
+            <span className={auth.roleIcon}>🎤</span>
+            <strong className={auth.roleName}>Organizer</strong>
+            <small className={auth.roleDesc}>
+              Ingin menyelenggarakan konser
+            </small>
+            <span className={auth.roleCheck}>
               {role === "organizer" ? "✓" : ""}
             </span>
           </button>
         </div>
 
-        <form className="auth-form" onSubmit={handleRegister}>
-          <label htmlFor="name">Nama Lengkap</label>
+        <form className={auth.form} onSubmit={handleRegister}>
+          <label htmlFor="name" className={auth.label}>
+            Nama Lengkap
+          </label>
 
           <input
             id="name"
@@ -168,11 +173,12 @@ export default function RegisterPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             autoComplete="name"
+            className={auth.input}
           />
 
           {role === "organizer" && (
             <>
-              <label htmlFor="organization">
+              <label htmlFor="organization" className={auth.label}>
                 Nama Organisasi / Penyelenggara
               </label>
 
@@ -182,11 +188,14 @@ export default function RegisterPage() {
                 placeholder="Masukkan nama organisasi"
                 value={organization}
                 onChange={(e) => setOrganization(e.target.value)}
+                className={auth.input}
               />
             </>
           )}
 
-          <label htmlFor="register-email">Email</label>
+          <label htmlFor="register-email" className={auth.label}>
+            Email
+          </label>
 
           <input
             id="register-email"
@@ -195,11 +204,14 @@ export default function RegisterPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
+            className={auth.input}
           />
 
-          <label htmlFor="register-password">Password</label>
+          <label htmlFor="register-password" className={auth.label}>
+            Password
+          </label>
 
-          <div className="password-field">
+          <div className={auth.passwordWrap}>
             <input
               id="register-password"
               type={showPassword ? "text" : "password"}
@@ -207,21 +219,23 @@ export default function RegisterPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="new-password"
+              className={auth.passwordInput}
             />
 
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
+              className={auth.passwordToggle}
             >
               {showPassword ? "Sembunyikan" : "Lihat"}
             </button>
           </div>
 
-          <label htmlFor="confirm-password">
+          <label htmlFor="confirm-password" className={auth.label}>
             Konfirmasi Password
           </label>
 
-          <div className="password-field">
+          <div className={auth.passwordWrap}>
             <input
               id="confirm-password"
               type={showConfirmPassword ? "text" : "password"}
@@ -229,45 +243,45 @@ export default function RegisterPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               autoComplete="new-password"
+              className={auth.passwordInput}
             />
 
             <button
               type="button"
-              onClick={() =>
-                setShowConfirmPassword(!showConfirmPassword)
-              }
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className={auth.passwordToggle}
             >
               {showConfirmPassword ? "Sembunyikan" : "Lihat"}
             </button>
           </div>
 
           {role === "organizer" && (
-            <p className="organizer-notice">
-              Pendaftaran Organizer akan melalui proses verifikasi
-              Admin sebelum dapat menerbitkan konser.
+            <p className={auth.notice}>
+              Pendaftaran Organizer akan melalui proses verifikasi Admin
+              sebelum dapat menerbitkan konser.
             </p>
           )}
 
           {error && (
-            <p className="auth-error" role="alert">
+            <p className={auth.error} role="alert">
               {error}
             </p>
           )}
 
-          <button type="submit" className="auth-submit">
+          <button type="submit" className={auth.submit}>
             Daftar sebagai {role === "buyer" ? "Buyer" : "Organizer"}
           </button>
         </form>
 
-        <p className="auth-switch">
+        <p className={auth.switchText}>
           Sudah punya akun?{" "}
-          <Link href="/login">Masuk sekarang</Link>
+          <Link href="/login" className={auth.switchLink}>
+            Masuk sekarang
+          </Link>
         </p>
       </div>
 
-      <p className="auth-footer">
-        © 2026 ENCORE. All rights reserved.
-      </p>
+      <p className={auth.footer}>© 2026 ENCORE. All rights reserved.</p>
     </main>
   );
 }

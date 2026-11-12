@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -84,9 +83,7 @@ export default function MyTicketsPage() {
 
       const userTickets = savedOrders.filter((order) => {
         const paid = ["paid", "success", "settlement"].includes(
-          String(
-            order.status || order.paymentStatus || ""
-          ).toLowerCase()
+          String(order.status || order.paymentStatus || "").toLowerCase()
         );
 
         const belongsToUser =
@@ -104,11 +101,9 @@ export default function MyTicketsPage() {
     }
   }, [router]);
 
-  // Mengambil informasi konser.
   function getConcert(order) {
     return concerts.find(
-      (concert) =>
-        String(concert.id) === String(order.concertId)
+      (concert) => String(concert.id) === String(order.concertId)
     );
   }
 
@@ -118,10 +113,7 @@ export default function MyTicketsPage() {
 
   function getQuantity(order) {
     return Number(
-      order.ticketQuantity ??
-      order.quantity ??
-      order.totalPersons ??
-      1
+      order.ticketQuantity ?? order.quantity ?? order.totalPersons ?? 1
     );
   }
 
@@ -134,22 +126,9 @@ export default function MyTicketsPage() {
         order.concertTitle ||
         order.eventName ||
         "Konser ENCORE",
-
-      artist:
-        concert?.artist ||
-        order.artist ||
-        "Live Music Event",
-
-      image:
-        concert?.image ||
-        order.concertImage ||
-        "",
-
-      date:
-        concert?.date ||
-        order.concertDate ||
-        "-",
-
+      artist: concert?.artist || order.artist || "Live Music Event",
+      image: concert?.image || order.concertImage || "",
+      date: concert?.date || order.concertDate || "-",
       location:
         concert?.location ||
         concert?.venue ||
@@ -166,19 +145,13 @@ export default function MyTicketsPage() {
   }
 
   function getTotal(order) {
-    return Number(
-      order.total ||
-      order.totalPrice ||
-      order.totalAmount ||
-      0
-    );
+    return Number(order.total || order.totalPrice || order.totalAmount || 0);
   }
 
   function formatPrice(value) {
     return `Rp${Number(value || 0).toLocaleString("id-ID")}`;
   }
 
-  // Filter tanggal dilakukan setelah halaman berjalan di browser.
   useEffect(() => {
     if (!tickets.length) {
       setFilteredTickets([]);
@@ -197,9 +170,7 @@ export default function MyTicketsPage() {
 
       date.setHours(0, 0, 0, 0);
 
-      return eventStatus === "upcoming"
-        ? date >= today
-        : date < today;
+      return eventStatus === "upcoming" ? date >= today : date < today;
     });
 
     setFilteredTickets(result);
@@ -220,7 +191,7 @@ export default function MyTicketsPage() {
 
   if (loading) {
     return (
-      <div className="account-loading">
+      <div className="grid min-h-[60vh] place-items-center bg-[#090611] text-white">
         Memuat tiket ENCORE...
       </div>
     );
@@ -230,82 +201,97 @@ export default function MyTicketsPage() {
 
   return (
     <BuyerAccountLayout>
-      <div className="my-ticket-page">
-
+      <div className={`text-white ${selectedTicket ? "print:hidden" : ""}`}>
         {/* HEADER */}
-        <div className="my-ticket-heading">
+        <div className="mb-[25px] flex items-center justify-between gap-[15px] max-[700px]:flex-col max-[700px]:items-start">
           <div>
-            <span className="buyer-panel-eyebrow">
+            <span className="text-[11px] font-bold tracking-[2px] text-[#bd91ff]">
               ENCORE / TIKET EVENT
             </span>
 
-            <h1>Tiket Event</h1>
+            <h1 className="my-[9px] font-heading text-[27px] font-bold">
+              Tiket Event
+            </h1>
 
-            <p>
-              Semua tiket konser yang berhasil kamu pesan
-              tersedia di sini.
+            <p className="text-[13px] text-[#b9abc9]">
+              Semua tiket konser yang berhasil kamu pesan tersedia di sini.
             </p>
           </div>
 
-          <Link href="/concerts" className="ticket-explore-link">
+          <Link
+            href="/concerts"
+            className="text-[13px] whitespace-nowrap text-[#c69bff] hover:text-white"
+          >
             Cari Konser →
           </Link>
         </div>
 
         {/* RINGKASAN TIKET */}
-        <div className="ticket-stat-row">
-          <div className="ticket-stat">
-            <span>Total Pesanan</span>
-            <strong>{tickets.length}</strong>
+        <div className="mb-[25px] grid grid-cols-2 gap-3.5">
+          <div className="rounded-[13px] border border-[#382a49] bg-[#21172e] p-[18px]">
+            <span className="block text-xs text-[#b9abc9]">Total Pesanan</span>
+            <strong className="mt-2 block text-[25px] text-[#c69bff]">
+              {tickets.length}
+            </strong>
           </div>
 
-          <div className="ticket-stat">
-            <span>Total Tiket</span>
-            <strong>{totalTickets}</strong>
+          <div className="rounded-[13px] border border-[#382a49] bg-[#21172e] p-[18px]">
+            <span className="block text-xs text-[#b9abc9]">Total Tiket</span>
+            <strong className="mt-2 block text-[25px] text-[#c69bff]">
+              {totalTickets}
+            </strong>
           </div>
         </div>
 
         {/* TIKET TRANSAKSI / PERSONAL */}
-        <div className="ticket-type-tabs">
+        <div className="mb-7 flex w-fit max-w-full gap-2 rounded-[30px] bg-[#21172e] p-[5px]">
           <button
             type="button"
-            className={
-              ticketType === "transaction" ? "active" : ""
-            }
             onClick={() => setTicketType("transaction")}
+            className={`cursor-pointer rounded-[25px] border-0 px-[18px] py-[11px] text-[13px] transition ${
+              ticketType === "transaction"
+                ? "bg-[#8050d5] text-white"
+                : "bg-transparent text-[#c9bdd8] hover:text-white"
+            }`}
           >
             ▣ Tiket Transaksi
           </button>
 
           <button
             type="button"
-            className={
-              ticketType === "personal" ? "active" : ""
-            }
             onClick={() => setTicketType("personal")}
+            className={`cursor-pointer rounded-[25px] border-0 px-[18px] py-[11px] text-[13px] transition ${
+              ticketType === "personal"
+                ? "bg-[#8050d5] text-white"
+                : "bg-transparent text-[#c9bdd8] hover:text-white"
+            }`}
           >
             ♙ Tiket Personal
           </button>
         </div>
 
         {/* EVENT MENDATANG / BERAKHIR */}
-        <div className="ticket-event-tabs">
+        <div className="mb-6 flex gap-6 border-b border-[#382a49]">
           <button
             type="button"
-            className={
-              eventStatus === "upcoming" ? "active" : ""
-            }
             onClick={() => setEventStatus("upcoming")}
+            className={`cursor-pointer border-0 border-b-2 bg-transparent px-3 pb-[13px] text-sm transition ${
+              eventStatus === "upcoming"
+                ? "border-[#ad7aff] text-white"
+                : "border-transparent text-[#b9abc9] hover:text-white"
+            }`}
           >
             Event Mendatang
           </button>
 
           <button
             type="button"
-            className={
-              eventStatus === "ended" ? "active" : ""
-            }
             onClick={() => setEventStatus("ended")}
+            className={`cursor-pointer border-0 border-b-2 bg-transparent px-3 pb-[13px] text-sm transition ${
+              eventStatus === "ended"
+                ? "border-[#ad7aff] text-white"
+                : "border-transparent text-[#b9abc9] hover:text-white"
+            }`}
           >
             Event Berakhir
           </button>
@@ -313,10 +299,10 @@ export default function MyTicketsPage() {
 
         {/* DAFTAR TIKET */}
         {filteredTickets.length === 0 ? (
-          <div className="buyer-ticket-empty">
-            <div className="buyer-ticket-empty-icon">♫</div>
+          <div className="flex min-h-[280px] flex-col items-center justify-center rounded-[13px] bg-[#21172e] p-[30px] text-center">
+            <div className="text-[45px] text-[#b77aff]">♫</div>
 
-            <h3>
+            <h3 className="mt-3 mb-[7px] font-heading text-lg font-bold">
               {tickets.length === 0
                 ? "Belum Ada Tiket"
                 : eventStatus === "upcoming"
@@ -324,107 +310,128 @@ export default function MyTicketsPage() {
                   : "Belum Ada Event Berakhir"}
             </h3>
 
-            <p>
+            <p className="max-w-[390px] text-[13px] leading-[1.6] text-[#b9abc9]">
               {tickets.length === 0
                 ? "Tiket akan muncul otomatis setelah pembayaran pesananmu berhasil."
                 : "Tiket untuk kategori ini belum tersedia."}
             </p>
 
-            <Link href="/concerts">
+            <Link
+              href="/concerts"
+              className="mt-[18px] rounded-[9px] bg-[#8050d5] px-[19px] py-[11px] text-[13px] font-medium text-white hover:bg-[#7040c5]"
+            >
               Jelajahi Konser
             </Link>
           </div>
         ) : (
-          <div className="buyer-ticket-list">
+          <div className="flex flex-col gap-[17px]">
             {filteredTickets.map((order, index) => {
               const info = getTicketInfo(order);
               const code = getTicketCode(order);
-              const checkedIn =
-                order.checkInStatus === "checked_in";
+              const checkedIn = order.checkInStatus === "checked_in";
 
               return (
                 <article
-                  className="buyer-ticket-card"
+                  className="grid grid-cols-[minmax(0,1fr)_190px] overflow-hidden rounded-[14px] border border-[#382a49] bg-[#21172e] max-[700px]:grid-cols-1"
                   key={`${order.id || code}-${index}`}
                 >
-                  <div className="buyer-ticket-main">
-                    <div className="buyer-ticket-image">
+                  <div className="flex min-w-0 gap-[18px] p-[19px] max-[700px]:flex-col">
+                    <div className="grid h-[165px] w-[125px] shrink-0 place-items-center overflow-hidden rounded-[9px] bg-[#302340] text-[40px] text-[#c69bff] max-[700px]:h-[180px] max-[700px]:w-full">
                       {info.image ? (
                         <img
                           src={info.image}
                           alt={info.title}
+                          className="size-full object-cover"
                         />
                       ) : (
                         <span>♫</span>
                       )}
                     </div>
 
-                    <div className="buyer-ticket-info">
-                      <div className="buyer-ticket-badges">
-                        <span className="buyer-paid-badge">
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-[11px] flex flex-wrap gap-[7px]">
+                        <span className="rounded-[20px] bg-[#244534] px-[9px] py-1.5 text-[10px] font-bold text-[#a4edc0]">
                           ✓ Pembayaran Berhasil
                         </span>
 
                         <span
-                          className={
+                          className={`rounded-[20px] px-[9px] py-1.5 text-[10px] font-bold ${
                             checkedIn
-                              ? "buyer-checkin-badge checked"
-                              : "buyer-checkin-badge"
-                          }
+                              ? "bg-[#244534] text-[#a4edc0]"
+                              : "bg-[#50391d] text-[#ffd38c]"
+                          }`}
                         >
                           {getStatus(order)}
                         </span>
                       </div>
 
-                      <h3>{info.title}</h3>
+                      <h3 className="m-0 font-heading text-lg font-bold">
+                        {info.title}
+                      </h3>
 
-                      <p className="buyer-ticket-artist">
+                      <p className="mt-1.5 text-xs text-[#b9abc9]">
                         {info.artist}
                       </p>
 
-                      <div className="buyer-ticket-details">
+                      <div className="my-[18px] grid grid-cols-2 gap-[15px]">
                         <div>
-                          <span>Tanggal</span>
-                          <strong>{info.date}</strong>
+                          <span className="mb-[5px] block text-[10px] text-[#a99ab7]">
+                            Tanggal
+                          </span>
+                          <strong className="block text-xs [overflow-wrap:anywhere]">
+                            {info.date}
+                          </strong>
                         </div>
 
                         <div>
-                          <span>Lokasi</span>
-                          <strong>{info.location}</strong>
+                          <span className="mb-[5px] block text-[10px] text-[#a99ab7]">
+                            Lokasi
+                          </span>
+                          <strong className="block text-xs [overflow-wrap:anywhere]">
+                            {info.location}
+                          </strong>
                         </div>
 
                         <div>
-                          <span>Kategori Tiket</span>
-                          <strong>
+                          <span className="mb-[5px] block text-[10px] text-[#a99ab7]">
+                            Kategori Tiket
+                          </span>
+                          <strong className="block text-xs [overflow-wrap:anywhere]">
                             {order.ticketName || "-"}
                           </strong>
                         </div>
 
                         <div>
-                          <span>Jumlah Tiket</span>
-                          <strong>
+                          <span className="mb-[5px] block text-[10px] text-[#a99ab7]">
+                            Jumlah Tiket
+                          </span>
+                          <strong className="block text-xs [overflow-wrap:anywhere]">
                             {getQuantity(order)} tiket
                           </strong>
                         </div>
                       </div>
 
-                      <div className="buyer-ticket-code">
-                        <span>KODE E-TIKET</span>
-                        <strong>{code}</strong>
+                      <div className="border-t border-dashed border-[#59436f] pt-3">
+                        <span className="mb-[5px] block text-[9px] tracking-[1px] text-[#a99ab7]">
+                          KODE E-TIKET
+                        </span>
+                        <strong className="block text-xs [overflow-wrap:anywhere] text-[#d0a4ff]">
+                          {code}
+                        </strong>
                       </div>
 
                       <button
                         type="button"
-                        className="buyer-ticket-detail-button"
                         onClick={() => openTicket(order)}
+                        className="mt-[13px] cursor-pointer rounded-lg border border-[#8051b5] bg-[#39224f] px-[13px] py-2.5 text-xs text-white transition hover:bg-[#4c2d69]"
                       >
                         Lihat Detail E-Ticket →
                       </button>
                     </div>
                   </div>
 
-                  <div className="buyer-ticket-qr">
-                    <div className="buyer-ticket-qr-box">
+                  <div className="flex flex-col items-center justify-center border-l border-dashed border-[#59436f] p-[15px] text-center max-[700px]:border-t max-[700px]:border-l-0">
+                    <div className="rounded-lg bg-white p-2">
                       <QRCodeCanvas
                         value={code}
                         size={135}
@@ -433,9 +440,9 @@ export default function MyTicketsPage() {
                       />
                     </div>
 
-                    <strong>QR Code Tiket</strong>
+                    <strong className="mt-3 text-xs">QR Code Tiket</strong>
 
-                    <p>
+                    <p className="mt-1.5 max-w-[150px] text-[10px] leading-normal text-[#b9abc9]">
                       Scan QR Code saat check-in konser.
                     </p>
                   </div>
@@ -449,22 +456,27 @@ export default function MyTicketsPage() {
       {/* MODAL DETAIL E-TICKET */}
       {selectedTicket && (
         <div
-          className="buyer-ticket-modal-overlay"
+          className="fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto bg-[#05030ce0] px-[15px] py-[25px] backdrop-blur-[7px] print:static print:block print:bg-white print:p-0"
           onClick={() => setSelectedTicket(null)}
         >
           <div
-            className="buyer-ticket-modal"
+            className="m-auto w-full max-w-[700px] rounded-2xl border border-[#49365b] bg-[#171025] p-[22px] text-white print:max-w-full print:border-0 print:shadow-none"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="buyer-ticket-modal-heading">
+            <div className="mb-[18px] flex items-center justify-between">
               <div>
-                <span>ENCORE DIGITAL TICKET</span>
-                <h2>Detail E-Ticket</h2>
+                <span className="text-[10px] tracking-[2px] text-[#bd91ff]">
+                  ENCORE DIGITAL TICKET
+                </span>
+                <h2 className="mt-[7px] font-heading text-xl font-bold">
+                  Detail E-Ticket
+                </h2>
               </div>
 
               <button
                 type="button"
                 onClick={() => setSelectedTicket(null)}
+                className="size-9 cursor-pointer rounded-full border border-[#49365b] bg-[#261936] text-[22px] text-white hover:bg-[#38254f] print:hidden"
               >
                 ×
               </button>
@@ -476,90 +488,128 @@ export default function MyTicketsPage() {
 
               return (
                 <>
-                  <div className="buyer-modal-poster">
+                  <div className="relative flex min-h-[190px] items-end overflow-hidden rounded-[10px] bg-[#302340]">
                     {info.image && (
-                      <img src={info.image} alt={info.title} />
+                      <img
+                        src={info.image}
+                        alt={info.title}
+                        className="absolute inset-0 size-full object-cover opacity-40"
+                      />
                     )}
 
-                    <div>
-                      <span>LIVE MUSIC EXPERIENCE</span>
-                      <h2>{info.title}</h2>
-                      <p>{info.artist}</p>
+                    <div className="relative p-[22px]">
+                      <span className="text-[10px] tracking-[2px] text-[#d4b5ff]">
+                        LIVE MUSIC EXPERIENCE
+                      </span>
+                      <h2 className="mt-1 font-heading text-xl font-bold">
+                        {info.title}
+                      </h2>
+                      <p className="text-sm text-[#e2d8f0]">{info.artist}</p>
                     </div>
                   </div>
 
-                  <div className="buyer-modal-details">
+                  <div className="grid grid-cols-2 gap-[18px] py-[23px]">
                     <div>
-                      <span>Nama Pemesan</span>
-                      <strong>
+                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                        Nama Pemesan
+                      </span>
+                      <strong className="block text-xs [overflow-wrap:anywhere]">
                         {selectedTicket.buyerName || user.name || "-"}
                       </strong>
                     </div>
 
                     <div>
-                      <span>Email</span>
-                      <strong>
+                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                        Email
+                      </span>
+                      <strong className="block text-xs [overflow-wrap:anywhere]">
                         {selectedTicket.buyerEmail || user.email || "-"}
                       </strong>
                     </div>
 
                     <div>
-                      <span>Nomor HP</span>
-                      <strong>
+                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                        Nomor HP
+                      </span>
+                      <strong className="block text-xs [overflow-wrap:anywhere]">
                         {selectedTicket.buyerPhone || "-"}
                       </strong>
                     </div>
 
                     <div>
-                      <span>Tanggal Konser</span>
-                      <strong>{info.date}</strong>
+                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                        Tanggal Konser
+                      </span>
+                      <strong className="block text-xs [overflow-wrap:anywhere]">
+                        {info.date}
+                      </strong>
                     </div>
 
                     <div>
-                      <span>Lokasi</span>
-                      <strong>{info.location}</strong>
+                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                        Lokasi
+                      </span>
+                      <strong className="block text-xs [overflow-wrap:anywhere]">
+                        {info.location}
+                      </strong>
                     </div>
 
                     <div>
-                      <span>Kategori Tiket</span>
-                      <strong>
+                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                        Kategori Tiket
+                      </span>
+                      <strong className="block text-xs [overflow-wrap:anywhere]">
                         {selectedTicket.ticketName || "-"}
                       </strong>
                     </div>
 
                     <div>
-                      <span>Jumlah Tiket</span>
-                      <strong>{getQuantity(selectedTicket)} tiket</strong>
+                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                        Jumlah Tiket
+                      </span>
+                      <strong className="block text-xs [overflow-wrap:anywhere]">
+                        {getQuantity(selectedTicket)} tiket
+                      </strong>
                     </div>
 
                     <div>
-                      <span>Harga Tiket</span>
-                      <strong>
+                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                        Harga Tiket
+                      </span>
+                      <strong className="block text-xs [overflow-wrap:anywhere]">
                         {formatPrice(selectedTicket.ticketPrice)}
                       </strong>
                     </div>
 
                     <div>
-                      <span>Total Pembayaran</span>
-                      <strong>
+                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                        Total Pembayaran
+                      </span>
+                      <strong className="block text-xs [overflow-wrap:anywhere]">
                         {formatPrice(getTotal(selectedTicket))}
                       </strong>
                     </div>
 
                     <div>
-                      <span>Metode Pembayaran</span>
-                      <strong>
+                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                        Metode Pembayaran
+                      </span>
+                      <strong className="block text-xs [overflow-wrap:anywhere]">
                         {selectedTicket.paymentMethod || "-"}
                       </strong>
                     </div>
 
                     <div>
-                      <span>Status Check-in</span>
-                      <strong>{getStatus(selectedTicket)}</strong>
+                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                        Status Check-in
+                      </span>
+                      <strong className="block text-xs [overflow-wrap:anywhere]">
+                        {getStatus(selectedTicket)}
+                      </strong>
                     </div>
                   </div>
 
-                  <div className="buyer-modal-qr">
+                  <div className="flex flex-col items-center gap-2.5 rounded-[10px] bg-white p-5 text-center text-[#24162f]">
                     <QRCodeCanvas
                       value={code}
                       size={180}
@@ -567,9 +617,9 @@ export default function MyTicketsPage() {
                       includeMargin
                     />
 
-                    <strong>{code}</strong>
+                    <strong className="[overflow-wrap:anywhere]">{code}</strong>
 
-                    <p>
+                    <p className="text-[11px]">
                       Tunjukkan QR Code ini kepada petugas konser.
                     </p>
                   </div>
@@ -577,14 +627,19 @@ export default function MyTicketsPage() {
               );
             })()}
 
-            <div className="buyer-modal-actions">
-              <button type="button" onClick={printTicket}>
+            <div className="mt-[18px] flex justify-end gap-2.5 max-[700px]:flex-col print:hidden">
+              <button
+                type="button"
+                onClick={printTicket}
+                className="cursor-pointer rounded-lg border-0 bg-[#8050d5] px-4 py-[11px] text-white hover:bg-[#7040c5] max-[700px]:w-full"
+              >
                 Cetak / Simpan E-Ticket
               </button>
 
               <button
                 type="button"
                 onClick={() => setSelectedTicket(null)}
+                className="cursor-pointer rounded-lg border border-[#49365b] bg-transparent px-4 py-[11px] text-white hover:bg-[#261936] max-[700px]:w-full"
               >
                 Tutup
               </button>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { supabase } from "../../../lib/supabase";
 
 export default function CheckinPage() {
   const router = useRouter();
@@ -10,50 +11,91 @@ export default function CheckinPage() {
   const scannerRef = useRef(null);
   const processingRef = useRef(false);
 
+  const [currentUser, setCurrentUser] = useState(null);
+  const [allowedEventIds, setAllowedEventIds] = useState(null); // null = semua event (admin)
   const [code, setCode] = useState("");
   const [result, setResult] = useState(null);
   const [scannerActive, setScannerActive] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [validating, setValidating] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [ready, setReady] = useState(false);
-  const [accessAllowed, setAccessAllowed] = useState(false);
 
-  // MEMERIKSA LOGIN DAN ROLE PENGGUNA
+  // 1. MEMERIKSA LOGIN, ROLE, DAN DAFTAR EVENT YANG DIIZINKAN
   useEffect(() => {
-    try {
-      const currentUser = JSON.parse(
-        localStorage.getItem("encoreCurrentUser") || "null"
-      );
+    const checkAccess = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (!currentUser) {
-        router.replace("/login?redirect=/organizer/checkin");
-        return;
-      }
-
-      const allowedRoles = ["admin", "organizer", "checkin"];
-
-      if (!allowedRoles.includes(currentUser.role)) {
-        if (currentUser.role === "buyer") {
-          router.replace("/buyer/dashboard");
-        } else {
-          router.replace("/login");
+        if (!user) {
+          router.replace("/login?redirect=/organizer/checkin");
+          return;
         }
-        return;
-      }
 
-      setAccessAllowed(true);
-      setReady(true);
-    } catch (error) {
-      localStorage.removeItem("encoreCurrentUser");
-      router.replace("/login");
-    }
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        if (!profile) {
+          router.replace("/login");
+          return;
+        }
+
+        const allowedRoles = ["admin", "organizer", "checkin"];
+        if (!allowedRoles.includes(profile.role)) {
+          if (profile.role === "buyer") {
+            router.replace("/buyer/dashboard");
+          } else {
+            router.replace("/login");
+          }
+          return;
+        }
+
+        if (profile.role !== "admin" && profile.status !== "active") {
+          await supabase.auth.signOut();
+          router.replace("/login");
+          return;
+        }
+
+        setCurrentUser(profile);
+
+        // Ambil daftar event yang boleh di-scan oleh user ini
+        if (profile.role === "organizer") {
+          const { data: myEvents } = await supabase
+            .from("events")
+            .select("id")
+            .eq("organizer_id", user.id);
+
+          setAllowedEventIds((myEvents || []).map((e) => e.id));
+        } else if (profile.role === "checkin") {
+          const { data: assignments } = await supabase
+            .from("event_staff")
+            .select("event_id")
+            .eq("staff_id", user.id);
+
+          setAllowedEventIds((assignments || []).map((a) => a.event_id));
+        } else {
+          setAllowedEventIds(null);
+        }
+
+        setReady(true);
+      } catch (error) {
+        console.error("Gagal memeriksa akses check-in:", error);
+        router.replace("/login");
+      }
+    };
+
+    checkAccess();
   }, [router]);
 
-  // MEMBERSIHKAN SCANNER SAAT KELUAR HALAMAN
+  // 2. MEMBERSIHKAN SCANNER SAAT KELUAR HALAMAN
   useEffect(() => {
     return () => {
       const scanner = scannerRef.current;
-
       if (scanner) {
         scanner.stop().catch(() => {});
         scanner.clear();
@@ -62,8 +104,8 @@ export default function CheckinPage() {
     };
   }, []);
 
-  function validateTicket(ticketCode) {
-    const cleanCode = ticketCode.trim();
+  async function validateTicket(ticketCode) {
+    const cleanCode = ticketCode.trim().toUpperCase();
 
     if (!cleanCode) {
       setResult({
@@ -73,18 +115,43 @@ export default function CheckinPage() {
       return;
     }
 
+    setValidating(true);
+
     try {
-      const savedOrders = JSON.parse(
-        localStorage.getItem("encoreOrders") || "[]"
-      );
+      // Cari tiket beserta data event, kategori tiket, dan order-nya
+      const { data: ticket, error: fetchError } = await supabase
+        .from("tickets")
+        .select(
+          `
+          *,
+          events (
+            id,
+            title
+          ),
+          ticket_types (
+            name
+          ),
+          orders (
+            id,
+            buyer_name,
+            buyer_email,
+            payment_status
+          )
+        `
+        )
+        .ilike("ticket_code", cleanCode)
+        .maybeSingle();
 
-      const orderIndex = savedOrders.findIndex(
-        (order) =>
-          String(order.ticketCode || "").toLowerCase() ===
-          cleanCode.toLowerCase()
-      );
+      if (fetchError) {
+        console.error("Fetch ticket error:", fetchError);
+        setResult({
+          type: "invalid",
+          message: "Gagal memeriksa tiket: " + fetchError.message,
+        });
+        return;
+      }
 
-      if (orderIndex === -1) {
+      if (!ticket) {
         setResult({
           type: "invalid",
           message: "Kode tiket tidak ditemukan.",
@@ -92,50 +159,81 @@ export default function CheckinPage() {
         return;
       }
 
-      const order = savedOrders[orderIndex];
-
-      if (order.status !== "paid") {
+      // Cek apakah petugas/organizer berhak melakukan check-in untuk event tiket ini
+      if (
+        Array.isArray(allowedEventIds) &&
+        !allowedEventIds.includes(ticket.event_id)
+      ) {
         setResult({
           type: "invalid",
-          message: "Pembayaran tiket belum berhasil.",
+          message:
+            "Kamu tidak memiliki akses untuk memvalidasi tiket pada event ini.",
         });
         return;
       }
 
-      if (order.checkInStatus === "checked_in") {
+      // Cek status pembayaran order
+      if (!ticket.orders || ticket.orders.payment_status !== "paid") {
+        setResult({
+          type: "invalid",
+          message: "Pembayaran tiket belum berhasil / belum lunas.",
+        });
+        return;
+      }
+
+      const formattedTicket = {
+        ticketCode: ticket.ticket_code,
+        buyerName:
+          ticket.holder_name ||
+          ticket.orders?.buyer_name ||
+          ticket.orders?.buyer_email ||
+          "-",
+        eventTitle: ticket.events?.title || "-",
+        ticketType: ticket.ticket_types?.name || "Regular",
+      };
+
+      // Cek apakah tiket sudah pernah di-scan
+      if (ticket.checked_in) {
         setResult({
           type: "used",
           message: "Tiket ini sudah pernah digunakan untuk check-in.",
-          ticket: order,
+          ticket: formattedTicket,
         });
         return;
       }
 
-      const updatedOrder = {
-        ...order,
-        checkInStatus: "checked_in",
-        checkInAt: new Date().toISOString(),
-      };
+      // Update status tiket menjadi sudah check-in
+      const { error: updateError } = await supabase
+        .from("tickets")
+        .update({
+          checked_in: true,
+          checked_in_at: new Date().toISOString(),
+        })
+        .eq("id", ticket.id);
 
-      const updatedOrders = [...savedOrders];
-      updatedOrders[orderIndex] = updatedOrder;
-
-      localStorage.setItem("encoreOrders", JSON.stringify(updatedOrders));
+      if (updateError) {
+        setResult({
+          type: "invalid",
+          message: "Gagal memperbarui status check-in: " + updateError.message,
+        });
+        return;
+      }
 
       setResult({
         type: "success",
         message: "Check-in berhasil! Selamat menikmati konser.",
-        ticket: updatedOrder,
+        ticket: formattedTicket,
       });
 
       setCode("");
     } catch (error) {
       console.error("Gagal memvalidasi tiket:", error);
-
       setResult({
         type: "invalid",
         message: "Terjadi kesalahan saat membaca data tiket.",
       });
+    } finally {
+      setValidating(false);
     }
   }
 
@@ -166,7 +264,7 @@ export default function CheckinPage() {
 
           try {
             await stopScanner();
-            validateTicket(decodedText);
+            await validateTicket(decodedText);
           } finally {
             processingRef.current = false;
           }
@@ -177,10 +275,8 @@ export default function CheckinPage() {
       setScannerActive(true);
     } catch (error) {
       console.error("Kamera gagal dibuka:", error);
-
       scannerRef.current = null;
       setScannerActive(false);
-
       setCameraError(
         "Kamera tidak dapat dibuka. Izinkan akses kamera di browser atau gunakan input kode tiket manual."
       );
@@ -191,7 +287,6 @@ export default function CheckinPage() {
 
   async function stopScanner() {
     const scanner = scannerRef.current;
-
     if (!scanner) return;
 
     try {
@@ -205,13 +300,19 @@ export default function CheckinPage() {
     setScannerActive(false);
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     setResult(null);
-    validateTicket(code);
+    await validateTicket(code);
   }
 
-  if (!ready || !accessAllowed) {
+  const handleStaffLogout = async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem("encoreCurrentUser");
+    router.push("/login");
+  };
+
+  if (!ready || !currentUser) {
     return (
       <div className="grid min-h-screen place-items-center bg-[#100b1c] text-white">
         Memeriksa akses ENCORE...
@@ -229,18 +330,32 @@ export default function CheckinPage() {
     <main className="box-border min-h-screen bg-[#100b1c] px-5 pb-10 text-[#f7f3ff] max-[550px]:px-3.5 max-[550px]:pb-[25px]">
       <header className="mx-auto flex max-w-[1100px] items-center justify-between border-b border-[#302340] py-[25px] max-[550px]:py-[18px]">
         <Link
-          href="/organizer/dashboard"
+          href={
+            currentUser.role === "checkin"
+              ? "/organizer/checkin"
+              : "/organizer/dashboard"
+          }
           className="text-[27px] font-black tracking-[2px] text-white max-[550px]:text-[22px]"
         >
           <span className="text-[#b77aff]">EN</span>CORE
         </Link>
 
-        <Link
-          href="/organizer/dashboard"
-          className="text-[13px] text-[#c394ff] max-[550px]:text-[11px]"
-        >
-          ← Kembali ke Dashboard
-        </Link>
+        {currentUser.role === "checkin" ? (
+          <button
+            type="button"
+            onClick={handleStaffLogout}
+            className="cursor-pointer rounded-lg border border-[#49365b] bg-[#1a1226] px-4 py-2 text-[13px] text-[#c394ff] transition hover:bg-[#2a1d3d]"
+          >
+            Keluar ({currentUser.name})
+          </button>
+        ) : (
+          <Link
+            href="/organizer/dashboard"
+            className="text-[13px] text-[#c394ff] max-[550px]:text-[11px]"
+          >
+            ← Kembali ke Dashboard
+          </Link>
+        )}
       </header>
 
       <section className="mx-auto mt-[45px] max-w-[720px] max-[550px]:mt-[30px]">
@@ -339,9 +454,10 @@ export default function CheckinPage() {
 
             <button
               type="submit"
-              className="mt-3 w-full cursor-pointer rounded-lg border-0 bg-[#a66be8] p-[13px] text-[13px] font-bold text-white"
+              disabled={validating}
+              className="mt-3 w-full cursor-pointer rounded-lg border-0 bg-[#a66be8] p-[13px] text-[13px] font-bold text-white disabled:opacity-60"
             >
-              Validasi Tiket
+              {validating ? "Memvalidasi..." : "Validasi Tiket"}
             </button>
           </form>
 
@@ -383,26 +499,19 @@ export default function CheckinPage() {
 
                   <div>
                     <span className="mb-[5px] block text-[10px] opacity-70">
-                      Nama Pemesan
+                      Event & Kategori
                     </span>
                     <strong className="block text-xs [overflow-wrap:anywhere]">
-                      {result.ticket.buyerName ||
-                        result.ticket.name ||
-                        result.ticket.buyerEmail ||
-                        "-"}
+                      {result.ticket.eventTitle} ({result.ticket.ticketType})
                     </strong>
                   </div>
 
                   <div>
                     <span className="mb-[5px] block text-[10px] opacity-70">
-                      Jumlah Tiket
+                      Nama Pemegang Tiket
                     </span>
                     <strong className="block text-xs [overflow-wrap:anywhere]">
-                      {result.ticket.ticketQuantity ||
-                        result.ticket.quantity ||
-                        result.ticket.totalPersons ||
-                        1}{" "}
-                      tiket
+                      {result.ticket.buyerName}
                     </strong>
                   </div>
                 </div>

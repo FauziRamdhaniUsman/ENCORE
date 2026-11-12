@@ -1,3 +1,7 @@
 export default function AdminPage() {
-  return <div>Halaman Admin</div>
+  return (
+    <main className="min-h-screen bg-background px-[7%] py-10 text-text">
+      Halaman Admin
+    </main>
+  );
 }

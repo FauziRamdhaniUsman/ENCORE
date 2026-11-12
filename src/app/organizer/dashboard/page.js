@@ -3,157 +3,185 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { supabase } from "../../../lib/supabase";
+
+const thClass =
+  "border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]";
+const tdClass =
+  "border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]";
 
 export default function OrganizerDashboard() {
   const router = useRouter();
 
-  const [orders, setOrders] = useState([]);
   const [organizerName, setOrganizerName] = useState("Organizer");
+  const [stats, setStats] = useState({
+    totalOrders: 0,
+    totalTickets: 0,
+    totalRevenue: 0,
+    checkedInTickets: 0,
+    pendingCheckIn: 0,
+  });
+  const [eventReports, setEventReports] = useState([]);
+  const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const user = JSON.parse(
-        localStorage.getItem("encoreCurrentUser") || "null"
-      );
+    const loadDashboardData = async () => {
+      try {
+        // 1. Verifikasi sesi login dan role organizer
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (!user || user.role !== "organizer") {
-        router.replace("/login");
-        return;
-      }
+        if (!user) {
+          router.replace("/login");
+          return;
+        }
 
-      const currentOrganizerId = String(user.id);
-      const currentOrganizerEmail = String(user.email || "").toLowerCase();
-      const currentOrganizerName = String(
-        user.organization || user.name || ""
-      ).toLowerCase();
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
 
-      setOrganizerName(user.organization || user.name || "Organizer");
+        if (!profile || profile.role !== "organizer") {
+          router.replace("/login");
+          return;
+        }
 
-      const savedOrders = JSON.parse(
-        localStorage.getItem("encoreOrders") || "[]"
-      );
+        if (profile.status !== "active") {
+          await supabase.auth.signOut();
+          router.replace("/login");
+          return;
+        }
 
-      const savedEvents = JSON.parse(
-        localStorage.getItem("encoreCustomConcerts") || "[]"
-      );
+        setOrganizerName(profile.organization || profile.name || "Organizer");
 
-      const myEventIds = Array.isArray(savedEvents)
-        ? savedEvents
-            .filter((event) => {
-              const eventOrganizerId =
-                event.organizerId ?? event.createdBy ?? event.userId;
+        // 2. Ambil semua event milik organizer ini
+        const { data: myEvents } = await supabase
+          .from("events")
+          .select("id, title")
+          .eq("organizer_id", user.id);
 
-              return (
-                eventOrganizerId != null &&
-                String(eventOrganizerId) === currentOrganizerId
-              );
-            })
-            .map((event) => String(event.id))
-        : [];
+        if (!myEvents || myEvents.length === 0) {
+          setLoading(false);
+          return;
+        }
 
-      const myEventNames = Array.isArray(savedEvents)
-        ? savedEvents
-            .filter((event) => {
-              const eventOrganizerId =
-                event.organizerId ?? event.createdBy ?? event.userId;
+        const eventIds = myEvents.map((ev) => ev.id);
+        const eventTitleMap = Object.fromEntries(
+          myEvents.map((ev) => [ev.id, ev.title])
+        );
 
-              return (
-                eventOrganizerId != null &&
-                String(eventOrganizerId) === currentOrganizerId
-              );
-            })
-            .map((event) =>
-              String(event.title || event.name || "").toLowerCase()
+        // 3. Ambil seluruh tiket & order yang terhubung dengan event milik organizer
+        const { data: ticketsData } = await supabase
+          .from("tickets")
+          .select(
+            `
+            id,
+            event_id,
+            order_id,
+            checked_in,
+            orders (
+              id,
+              buyer_name,
+              buyer_email,
+              total,
+              payment_status,
+              created_at
             )
-        : [];
+          `
+          )
+          .in("event_id", eventIds);
 
-      const myOrders = Array.isArray(savedOrders)
-        ? savedOrders.filter((order) => {
-            if (order.status !== "paid") {
-              return false;
+        // Filter hanya tiket dari order yang sudah lunas (paid)
+        const paidTickets = (ticketsData || []).filter(
+          (t) => t.orders && t.orders.payment_status === "paid"
+        );
+
+        // Kelompokkan order unik untuk menghitung total pesanan & total pendapatan
+        const uniqueOrdersMap = new Map();
+        const reportMap = {};
+
+        myEvents.forEach((ev) => {
+          reportMap[ev.id] = {
+            id: ev.id,
+            name: ev.title,
+            orderIds: new Set(),
+            tickets: 0,
+            revenue: 0,
+            checkedIn: 0,
+          };
+        });
+
+        paidTickets.forEach((ticket) => {
+          const order = ticket.orders;
+          const evId = ticket.event_id;
+
+          if (!uniqueOrdersMap.has(order.id)) {
+            uniqueOrdersMap.set(order.id, {
+              ...order,
+              concertTitle: eventTitleMap[evId] || "Event",
+              ticketCount: 0,
+              checkedInCount: 0,
+            });
+          }
+
+          const orderEntry = uniqueOrdersMap.get(order.id);
+          orderEntry.ticketCount += 1;
+          if (ticket.checked_in) orderEntry.checkedInCount += 1;
+
+          if (reportMap[evId]) {
+            reportMap[evId].tickets += 1;
+            if (ticket.checked_in) reportMap[evId].checkedIn += 1;
+
+            if (!reportMap[evId].orderIds.has(order.id)) {
+              reportMap[evId].orderIds.add(order.id);
+              reportMap[evId].revenue += Number(order.total || 0);
             }
+          }
+        });
 
-            const orderOrganizerId =
-              order.organizerId ?? order.createdBy ?? order.userIdOrganizer;
+        const ordersList = Array.from(uniqueOrdersMap.values()).sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+        );
 
-            const orderOrganizerEmail = String(
-              order.organizerEmail || ""
-            ).toLowerCase();
+        const totalTickets = paidTickets.length;
+        const checkedInTickets = paidTickets.filter((t) => t.checked_in).length;
+        const totalRevenue = ordersList.reduce(
+          (sum, ord) => sum + Number(ord.total || 0),
+          0
+        );
 
-            const organizerValue =
-              typeof order.organizer === "string"
-                ? order.organizer
-                : order.organizer?.name ||
-                  order.organizer?.organization ||
-                  "";
+        setStats({
+          totalOrders: ordersList.length,
+          totalTickets,
+          totalRevenue,
+          checkedInTickets,
+          pendingCheckIn: Math.max(0, totalTickets - checkedInTickets),
+        });
 
-            const orderOrganizerName = String(organizerValue).toLowerCase();
+        setEventReports(
+          Object.values(reportMap).map((item) => ({
+            id: item.id,
+            name: item.name,
+            orders: item.orderIds.size,
+            tickets: item.tickets,
+            revenue: item.revenue,
+            checkedIn: item.checkedIn,
+          }))
+        );
 
-            const orderEventId = String(
-              order.concertId ?? order.eventId ?? ""
-            );
+        setRecentOrders(ordersList);
+      } catch (error) {
+        console.error("Gagal memuat dashboard organizer:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-            const orderEventName = String(
-              order.concertTitle || order.eventName || ""
-            ).toLowerCase();
-
-            if (orderOrganizerId != null) {
-              return String(orderOrganizerId) === currentOrganizerId;
-            }
-
-            if (orderOrganizerEmail) {
-              return orderOrganizerEmail === currentOrganizerEmail;
-            }
-
-            if (orderEventId && myEventIds.includes(orderEventId)) {
-              return true;
-            }
-
-            if (orderEventName && myEventNames.includes(orderEventName)) {
-              return true;
-            }
-
-            if (orderOrganizerName && currentOrganizerName) {
-              return orderOrganizerName === currentOrganizerName;
-            }
-
-            return false;
-          })
-        : [];
-
-      setOrders(myOrders);
-    } catch (error) {
-      console.error("Gagal membaca transaksi:", error);
-      setOrders([]);
-    } finally {
-      setLoading(false);
-    }
+    loadDashboardData();
   }, [router]);
-
-  const getQuantity = (order) =>
-    Number(
-      order.ticketQuantity ?? order.quantity ?? order.totalPersons ?? 1
-    );
-
-  const totalTickets = orders.reduce(
-    (total, order) => total + getQuantity(order),
-    0
-  );
-
-  const totalRevenue = orders.reduce(
-    (total, order) => total + Number(order.total || 0),
-    0
-  );
-
-  const checkedInTickets = orders.reduce(
-    (total, order) =>
-      total +
-      (order.checkInStatus === "checked_in" ? getQuantity(order) : 0),
-    0
-  );
-
-  const pendingCheckIn = Math.max(0, totalTickets - checkedInTickets);
 
   const formatPrice = (price) =>
     new Intl.NumberFormat("id-ID", {
@@ -161,35 +189,6 @@ export default function OrganizerDashboard() {
       currency: "IDR",
       maximumFractionDigits: 0,
     }).format(price);
-
-  const eventReports = Object.values(
-    orders.reduce((groups, order) => {
-      const eventName =
-        order.concertTitle || order.eventName || "Event Tanpa Nama";
-
-      if (!groups[eventName]) {
-        groups[eventName] = {
-          name: eventName,
-          orders: 0,
-          tickets: 0,
-          revenue: 0,
-          checkedIn: 0,
-        };
-      }
-
-      const quantity = getQuantity(order);
-
-      groups[eventName].orders += 1;
-      groups[eventName].tickets += quantity;
-      groups[eventName].revenue += Number(order.total || 0);
-
-      if (order.checkInStatus === "checked_in") {
-        groups[eventName].checkedIn += quantity;
-      }
-
-      return groups;
-    }, {})
-  );
 
   if (loading) {
     return (
@@ -215,21 +214,21 @@ export default function OrganizerDashboard() {
         <div className="flex flex-wrap gap-3 max-[700px]:w-full">
           <Link
             href="/organizer/events"
-            className="inline-block rounded-[10px] border border-[#49316d] bg-[#281b39] px-5 py-[13px] text-[13px] font-bold text-white"
+            className="inline-block rounded-[10px] border border-[#49316d] bg-[#281b39] px-5 py-[13px] text-[13px] font-bold text-white transition hover:border-[#a766e8]"
           >
             Manajemen Event
           </Link>
 
           <Link
             href="/organizer/staff"
-            className="inline-block rounded-[10px] border border-[#49316d] bg-[#281b39] px-5 py-[13px] text-[13px] font-bold text-white"
+            className="inline-block rounded-[10px] border border-[#49316d] bg-[#281b39] px-5 py-[13px] text-[13px] font-bold text-white transition hover:border-[#a766e8]"
           >
             Manajemen Petugas
           </Link>
 
           <Link
             href="/organizer/checkin"
-            className="inline-block rounded-[10px] bg-[#a766e8] px-5 py-[13px] text-[13px] font-bold text-white"
+            className="inline-block rounded-[10px] bg-[#a766e8] px-5 py-[13px] text-[13px] font-bold text-white transition hover:brightness-110"
           >
             Scan Tiket →
           </Link>
@@ -240,7 +239,7 @@ export default function OrganizerDashboard() {
         <div className="rounded-[15px] border border-[#39274b] bg-[#1c1229] p-[25px]">
           <span className="text-[13px] text-[#b9a9d0]">Total Pesanan</span>
           <h2 className="mt-[15px] mb-0 font-heading text-[27px] text-[#c58aff]">
-            {orders.length}
+            {stats.totalOrders}
           </h2>
         </div>
 
@@ -249,14 +248,14 @@ export default function OrganizerDashboard() {
             Total Tiket Terjual
           </span>
           <h2 className="mt-[15px] mb-0 font-heading text-[27px] text-[#c58aff]">
-            {totalTickets}
+            {stats.totalTickets}
           </h2>
         </div>
 
         <div className="rounded-[15px] border border-[#39274b] bg-[#1c1229] p-[25px]">
           <span className="text-[13px] text-[#b9a9d0]">Total Pendapatan</span>
           <h2 className="mt-[15px] mb-0 font-heading text-[27px] text-[#c58aff]">
-            {formatPrice(totalRevenue)}
+            {formatPrice(stats.totalRevenue)}
           </h2>
         </div>
 
@@ -265,28 +264,26 @@ export default function OrganizerDashboard() {
             Tiket Sudah Check-in
           </span>
           <h2 className="mt-[15px] mb-0 font-heading text-[27px] text-[#c58aff]">
-            {checkedInTickets}
+            {stats.checkedInTickets}
           </h2>
         </div>
 
         <div className="rounded-[15px] border border-[#39274b] bg-[#1c1229] p-[25px]">
           <span className="text-[13px] text-[#b9a9d0]">Belum Check-in</span>
           <h2 className="mt-[15px] mb-0 font-heading text-[27px] text-[#c58aff]">
-            {pendingCheckIn}
+            {stats.pendingCheckIn}
           </h2>
         </div>
       </section>
 
       <section className="mb-[25px] rounded-[15px] border border-[#39274b] bg-[#1c1229] p-[25px]">
         <div className="mb-5">
-          <div>
-            <h2 className="mt-0 font-heading text-xl font-bold">
-              Laporan Penjualan per Event
-            </h2>
-            <p className="mb-[25px] text-[#b9a9d0]">
-              Ringkasan performa penjualan event milikmu.
-            </p>
-          </div>
+          <h2 className="mt-0 font-heading text-xl font-bold">
+            Laporan Penjualan per Event
+          </h2>
+          <p className="mb-[25px] text-[#b9a9d0]">
+            Ringkasan performa penjualan event milikmu.
+          </p>
         </div>
 
         {eventReports.length === 0 ? (
@@ -298,48 +295,28 @@ export default function OrganizerDashboard() {
             <table className="w-full min-w-[800px] border-collapse">
               <thead>
                 <tr>
-                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
-                    Nama Event
-                  </th>
-                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
-                    Pesanan
-                  </th>
-                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
-                    Tiket Terjual
-                  </th>
-                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
-                    Pendapatan
-                  </th>
-                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
-                    Sudah Check-in
-                  </th>
-                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
-                    Belum Check-in
-                  </th>
+                  <th className={thClass}>Nama Event</th>
+                  <th className={thClass}>Pesanan</th>
+                  <th className={thClass}>Tiket Terjual</th>
+                  <th className={thClass}>Pendapatan</th>
+                  <th className={thClass}>Sudah Check-in</th>
+                  <th className={thClass}>Belum Check-in</th>
                 </tr>
               </thead>
 
               <tbody>
-                {eventReports.map((event, index) => (
-                  <tr key={`${event.name}-${index}`}>
-                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
-                      {event.name}
-                    </td>
-                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
-                      {event.orders}
-                    </td>
-                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
-                      {event.tickets}
-                    </td>
-                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
-                      {formatPrice(event.revenue)}
-                    </td>
-                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
+                {eventReports.map((event) => (
+                  <tr key={event.id}>
+                    <td className={tdClass}>{event.name}</td>
+                    <td className={tdClass}>{event.orders}</td>
+                    <td className={tdClass}>{event.tickets}</td>
+                    <td className={tdClass}>{formatPrice(event.revenue)}</td>
+                    <td className={tdClass}>
                       <span className="rounded-[20px] bg-[#183d30] px-2.5 py-1.5 text-[11px] whitespace-nowrap text-[#65e5a4]">
                         {event.checkedIn}
                       </span>
                     </td>
-                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
+                    <td className={tdClass}>
                       <span className="rounded-[20px] bg-[#49351d] px-2.5 py-1.5 text-[11px] whitespace-nowrap text-[#ffc76a]">
                         {event.tickets - event.checkedIn}
                       </span>
@@ -360,7 +337,7 @@ export default function OrganizerDashboard() {
           Daftar transaksi tiket event milikmu yang berhasil dibayar.
         </p>
 
-        {orders.length === 0 ? (
+        {recentOrders.length === 0 ? (
           <div className="rounded-[10px] bg-[#160e21] p-[35px] text-center text-[#b9a9d0]">
             Belum ada transaksi yang berhasil.
           </div>
@@ -369,57 +346,36 @@ export default function OrganizerDashboard() {
             <table className="w-full min-w-[800px] border-collapse">
               <thead>
                 <tr>
-                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
-                    Pemesan
-                  </th>
-                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
-                    Email
-                  </th>
-                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
-                    Konser
-                  </th>
-                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
-                    Jumlah Tiket
-                  </th>
-                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
-                    Total Pembayaran
-                  </th>
-                  <th className="border-b border-[#39274b] p-4 text-left text-xs whitespace-nowrap text-[#bd83ff]">
-                    Status Check-in
-                  </th>
+                  <th className={thClass}>Pemesan</th>
+                  <th className={thClass}>Email</th>
+                  <th className={thClass}>Konser</th>
+                  <th className={thClass}>Jumlah Tiket</th>
+                  <th className={thClass}>Total Pembayaran</th>
+                  <th className={thClass}>Status Check-in</th>
                 </tr>
               </thead>
 
               <tbody>
-                {orders.map((order, index) => (
-                  <tr
-                    key={`${
-                      order.id || order.ticketCode || "order"
-                    }-${index}`}
-                  >
-                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
-                      {order.buyerName || "-"}
-                    </td>
-                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
-                      {order.buyerEmail || "-"}
-                    </td>
-                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
-                      {order.concertTitle || order.eventName || "-"}
-                    </td>
-                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
-                      {getQuantity(order)}
-                    </td>
-                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
+                {recentOrders.map((order) => (
+                  <tr key={order.id}>
+                    <td className={tdClass}>{order.buyer_name || "-"}</td>
+                    <td className={tdClass}>{order.buyer_email || "-"}</td>
+                    <td className={tdClass}>{order.concertTitle}</td>
+                    <td className={tdClass}>{order.ticketCount}</td>
+                    <td className={tdClass}>
                       {formatPrice(Number(order.total || 0))}
                     </td>
-                    <td className="border-b border-[#39274b] p-4 text-[13px] text-[#eee5fa]">
-                      {order.checkInStatus === "checked_in" ? (
+                    <td className={tdClass}>
+                      {order.checkedInCount === order.ticketCount &&
+                      order.ticketCount > 0 ? (
                         <span className="rounded-[20px] bg-[#183d30] px-2.5 py-1.5 text-[11px] whitespace-nowrap text-[#65e5a4]">
-                          Sudah Check-in
+                          Sudah Check-in ({order.checkedInCount}/
+                          {order.ticketCount})
                         </span>
                       ) : (
                         <span className="rounded-[20px] bg-[#49351d] px-2.5 py-1.5 text-[11px] whitespace-nowrap text-[#ffc76a]">
-                          Belum Check-in
+                          Belum Check-in ({order.checkedInCount}/
+                          {order.ticketCount})
                         </span>
                       )}
                     </td>

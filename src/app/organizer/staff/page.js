@@ -3,64 +3,116 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { concerts } from "../../../data/concerts";
+import { createClient } from "@supabase/supabase-js";
+import { supabase } from "../../../lib/supabase";
 
 const inputClass =
   "mt-2 block w-full rounded-lg border border-[#493c60] bg-[#100b1c] p-3 text-white outline-none focus:border-primary-light";
 
 const buttonClass =
-  "mt-5 cursor-pointer rounded-lg border-0 bg-primary px-5 py-3 font-bold text-white transition hover:bg-[#7c3aed]";
+  "mt-5 cursor-pointer rounded-lg border-0 bg-primary px-5 py-3 font-bold text-white transition hover:bg-[#7c3aed] disabled:opacity-60";
 
 export default function StaffManagementPage() {
   const router = useRouter();
 
   const [organizer, setOrganizer] = useState(null);
+  const [myEvents, setMyEvents] = useState([]);
   const [staff, setStaff] = useState([]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [eventIds, setEventIds] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    const currentUser = JSON.parse(
-      localStorage.getItem("encoreCurrentUser") || "null"
-    );
+  const fetchStaffAndEvents = async (organizerId) => {
+    // 1. Ambil daftar event milik organizer dari Supabase
+    const { data: eventsData } = await supabase
+      .from("events")
+      .select("id, title")
+      .eq("organizer_id", organizerId)
+      .order("created_at", { ascending: false });
 
-    if (!currentUser || currentUser.role !== "organizer") {
-      router.replace("/login");
+    const eventsList = eventsData || [];
+    setMyEvents(eventsList);
+
+    // 2. Ambil daftar petugas check-in milik organizer
+    const { data: staffProfiles, error: staffError } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("role", "checkin")
+      .eq("organizer_id", organizerId)
+      .order("created_at", { ascending: false });
+
+    if (staffError) {
+      console.error("Gagal memuat data petugas:", staffError);
       return;
     }
 
-    setOrganizer(currentUser);
+    const profilesList = staffProfiles || [];
 
-    const users = JSON.parse(localStorage.getItem("encoreUsers") || "[]");
+    // 3. Ambil penugasan event dari tabel 'event_staff'
+    if (profilesList.length > 0) {
+      const staffIds = profilesList.map((s) => s.id);
+      const { data: assignments } = await supabase
+        .from("event_staff")
+        .select("staff_id, event_id")
+        .in("staff_id", staffIds);
 
-    setStaff(
-      users.filter(
-        (user) =>
-          user.role === "checkin" && user.organizerId === currentUser.id
-      )
-    );
-  }, [router]);
+      const enrichedStaff = profilesList.map((person) => {
+        const assignedIds = (assignments || [])
+          .filter((a) => a.staff_id === person.id)
+          .map((a) => a.event_id);
 
-  const saveStaff = (updatedStaff) => {
-    const users = JSON.parse(localStorage.getItem("encoreUsers") || "[]");
+        return {
+          ...person,
+          eventIds: assignedIds,
+        };
+      });
 
-    const otherUsers = users.filter(
-      (user) =>
-        !(user.role === "checkin" && user.organizerId === organizer.id)
-    );
-
-    localStorage.setItem(
-      "encoreUsers",
-      JSON.stringify([...otherUsers, ...updatedStaff])
-    );
-
-    setStaff(updatedStaff);
+      setStaff(enrichedStaff);
+    } else {
+      setStaff([]);
+    }
   };
 
-  const handleAddStaff = (e) => {
+  useEffect(() => {
+    const initPage = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+          router.replace("/login");
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        if (!profile || profile.role !== "organizer") {
+          router.replace("/login");
+          return;
+        }
+
+        setOrganizer(profile);
+        await fetchStaffAndEvents(user.id);
+      } catch (err) {
+        console.error("Error init staff page:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initPage();
+  }, [router]);
+
+  const handleAddStaff = async (e) => {
     e.preventDefault();
     setMessage("");
 
@@ -79,35 +131,92 @@ export default function StaffManagementPage() {
       return;
     }
 
-    const users = JSON.parse(localStorage.getItem("encoreUsers") || "[]");
-
+    setSubmitting(true);
     const normalizedEmail = email.trim().toLowerCase();
 
-    if (
-      users.some((user) => user.email?.toLowerCase() === normalizedEmail)
-    ) {
-      setMessage("Email sudah digunakan.");
-      return;
+    try {
+      // Gunakan client sementara tanpa persistSession agar sesi login Organizer tidak tertimpa
+      const tempSupabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+          },
+        }
+      );
+
+      // 1. Buat akun autentikasi petugas di Supabase Auth
+      const { data: signUpData, error: signUpError } =
+        await tempSupabase.auth.signUp({
+          email: normalizedEmail,
+          password,
+        });
+
+      if (signUpError) {
+        if (signUpError.message.toLowerCase().includes("already registered")) {
+          setMessage("Email sudah digunakan.");
+        } else {
+          setMessage(signUpError.message);
+        }
+        return;
+      }
+
+      const newUserId = signUpData?.user?.id;
+      if (!newUserId) {
+        setMessage("Gagal membuat akun petugas.");
+        return;
+      }
+
+      // 2. Simpan profil petugas ke tabel 'profiles'
+      const { error: profileError } = await supabase.from("profiles").insert([
+        {
+          id: newUserId,
+          name: name.trim(),
+          email: normalizedEmail,
+          role: "checkin",
+          status: "active",
+          organizer_id: organizer.id,
+        },
+      ]);
+
+      if (profileError) {
+        setMessage("Gagal menyimpan profil petugas: " + profileError.message);
+        return;
+      }
+
+      // 3. Simpan relasi event yang ditugaskan ke tabel 'event_staff'
+      const staffAssignments = eventIds.map((evId) => ({
+        staff_id: newUserId,
+        event_id: evId,
+      }));
+
+      const { error: assignError } = await supabase
+        .from("event_staff")
+        .insert(staffAssignments);
+
+      if (assignError) {
+        setMessage(
+          "Akun dibuat, namun gagal menyimpan tugas event: " +
+            assignError.message
+        );
+        return;
+      }
+
+      await fetchStaffAndEvents(organizer.id);
+
+      setName("");
+      setEmail("");
+      setPassword("");
+      setEventIds([]);
+      setMessage("Akun petugas berhasil dibuat.");
+    } catch (err) {
+      console.error("Add staff error:", err);
+      setMessage("Terjadi kesalahan saat membuat akun petugas.");
+    } finally {
+      setSubmitting(false);
     }
-
-    const newStaff = {
-      id: "staff-" + Date.now(),
-      name: name.trim(),
-      email: normalizedEmail,
-      password,
-      role: "checkin",
-      status: "active",
-      organizerId: organizer.id,
-      eventIds,
-    };
-
-    saveStaff([...staff, newStaff]);
-
-    setName("");
-    setEmail("");
-    setPassword("");
-    setEventIds([]);
-    setMessage("Akun petugas berhasil dibuat.");
   };
 
   const toggleEvent = (id) => {
@@ -118,20 +227,27 @@ export default function StaffManagementPage() {
     );
   };
 
-  const toggleStatus = (id) => {
-    const updated = staff.map((user) =>
-      user.id === id
-        ? {
-            ...user,
-            status: user.status === "active" ? "inactive" : "active",
-          }
-        : user
-    );
+  const toggleStatus = async (staffUser) => {
+    const nextStatus = staffUser.status === "active" ? "inactive" : "active";
 
-    saveStaff(updated);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ status: nextStatus })
+      .eq("id", staffUser.id);
+
+    if (error) {
+      setMessage("Gagal mengubah status petugas: " + error.message);
+      return;
+    }
+
+    setStaff((prev) =>
+      prev.map((user) =>
+        user.id === staffUser.id ? { ...user, status: nextStatus } : user
+      )
+    );
   };
 
-  if (!organizer) {
+  if (loading) {
     return (
       <div className="grid min-h-screen place-items-center bg-[#100b1c] text-white">
         Memuat Manajemen Petugas...
@@ -197,28 +313,35 @@ export default function StaffManagementPage() {
           </h3>
 
           <div className="mt-3">
-            {concerts.map((event) => (
-              <label
-                key={event.id}
-                className="mb-3 flex cursor-pointer items-center gap-2.5 text-sm"
-              >
-                <input
-                  type="checkbox"
-                  checked={eventIds.includes(String(event.id))}
-                  onChange={() => toggleEvent(String(event.id))}
-                  className="accent-primary"
-                />
-                {event.title}
-              </label>
-            ))}
+            {myEvents.length === 0 ? (
+              <p className="text-sm text-[#aaa]">
+                Kamu belum memiliki event. Buat event terlebih dahulu di menu
+                Manajemen Event.
+              </p>
+            ) : (
+              myEvents.map((event) => (
+                <label
+                  key={event.id}
+                  className="mb-3 flex cursor-pointer items-center gap-2.5 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked={eventIds.includes(event.id)}
+                    onChange={() => toggleEvent(event.id)}
+                    className="accent-primary"
+                  />
+                  {event.title}
+                </label>
+              ))
+            )}
           </div>
 
           {message && (
             <p className="mt-[15px] text-sm text-[#c4a3ff]">{message}</p>
           )}
 
-          <button type="submit" className={buttonClass}>
-            + Tambahkan Petugas
+          <button type="submit" disabled={submitting} className={buttonClass}>
+            {submitting ? "Menyimpan..." : "+ Tambahkan Petugas"}
           </button>
         </form>
       </section>
@@ -250,7 +373,7 @@ export default function StaffManagementPage() {
               <button
                 type="button"
                 className={buttonClass}
-                onClick={() => toggleStatus(user.id)}
+                onClick={() => toggleStatus(user)}
               >
                 {user.status === "active" ? "Nonaktifkan" : "Aktifkan"}
               </button>

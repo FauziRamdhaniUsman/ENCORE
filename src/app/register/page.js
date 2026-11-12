@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth } from "../../components/auth-styles";
+import { supabase } from "../../lib/supabase";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -16,18 +17,14 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     setError("");
 
-    if (
-      !name.trim() ||
-      !email.trim() ||
-      !password ||
-      !confirmPassword
-    ) {
+    if (!name.trim() || !email.trim() || !password || !confirmPassword) {
       setError("Semua kolom wajib diisi.");
       return;
     }
@@ -38,7 +35,6 @@ export default function RegisterPage() {
     }
 
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
     if (!emailPattern.test(email.trim())) {
       setError("Format email tidak valid.");
       return;
@@ -54,35 +50,50 @@ export default function RegisterPage() {
       return;
     }
 
+    setLoading(true);
+    const normalizedEmail = email.trim().toLowerCase();
+
     try {
-      const users = JSON.parse(
-        localStorage.getItem("encoreUsers") || "[]"
-      );
+      // 1. Daftarkan user di Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
+      });
 
-      const existingUser = users.find(
-        (user) =>
-          user.email.toLowerCase() === email.trim().toLowerCase()
-      );
-
-      if (existingUser) {
-        setError("Email sudah terdaftar. Silakan login.");
+      if (authError) {
+        if (authError.message.toLowerCase().includes("already registered")) {
+          setError("Email sudah terdaftar. Silakan login.");
+        } else {
+          setError(authError.message);
+        }
         return;
       }
 
-      const newUser = {
-        id: Date.now(),
-        name: name.trim(),
-        organization: role === "organizer" ? organization.trim() : "",
-        email: email.trim().toLowerCase(),
-        password,
-        role,
-        status: role === "buyer" ? "active" : "pending",
-        createdAt: new Date().toISOString(),
-      };
+      if (!authData?.user) {
+        setError("Pendaftaran gagal. Silakan coba kembali.");
+        return;
+      }
 
-      users.push(newUser);
+      // 2. Simpan detail role & profil ke tabel 'profiles'
+      const { error: profileError } = await supabase.from("profiles").insert([
+        {
+          id: authData.user.id,
+          name: name.trim(),
+          email: normalizedEmail,
+          role,
+          organization: role === "organizer" ? organization.trim() : null,
+          status: role === "buyer" ? "active" : "pending",
+        },
+      ]);
 
-      localStorage.setItem("encoreUsers", JSON.stringify(users));
+      if (profileError) {
+        console.error("Profile insert error:", profileError);
+        setError("Akun dibuat, namun gagal menyimpan profil: " + profileError.message);
+        return;
+      }
+
+      // Keluarkan session sementara agar user diarahkan ke halaman login
+      await supabase.auth.signOut();
 
       alert(
         role === "buyer"
@@ -92,11 +103,14 @@ export default function RegisterPage() {
 
       router.push("/login");
     } catch (err) {
+      console.error("Register error:", err);
       setError("Pendaftaran gagal. Silakan coba kembali.");
+    } finally {
+      setLoading(false);
     }
   };
 
-    const roleCard = (value) =>
+  const roleCard = (value) =>
     `${auth.roleCard} ${
       role === value ? auth.roleCardSelected : auth.roleCardIdle
     }`;
@@ -110,12 +124,10 @@ export default function RegisterPage() {
       <div className={auth.card}>
         <div className={auth.heading}>
           <span className={auth.eyebrow}>JOIN THE EXPERIENCE</span>
-
           <h1 className={auth.title}>Buat Akun ENCORE</h1>
-
           <p className={auth.subtitle}>
-            Bergabung dan nikmati pengalaman konser yang lebih mudah
-            bersama ENCORE.
+            Bergabung dan nikmati pengalaman konser yang lebih mudah bersama
+            ENCORE.
           </p>
         </div>
 
@@ -166,7 +178,6 @@ export default function RegisterPage() {
           <label htmlFor="name" className={auth.label}>
             Nama Lengkap
           </label>
-
           <input
             id="name"
             type="text"
@@ -182,7 +193,6 @@ export default function RegisterPage() {
               <label htmlFor="organization" className={auth.label}>
                 Nama Organisasi / Penyelenggara
               </label>
-
               <input
                 id="organization"
                 type="text"
@@ -197,7 +207,6 @@ export default function RegisterPage() {
           <label htmlFor="register-email" className={auth.label}>
             Email
           </label>
-
           <input
             id="register-email"
             type="email"
@@ -211,7 +220,6 @@ export default function RegisterPage() {
           <label htmlFor="register-password" className={auth.label}>
             Password
           </label>
-
           <div className={auth.passwordWrap}>
             <input
               id="register-password"
@@ -222,7 +230,6 @@ export default function RegisterPage() {
               autoComplete="new-password"
               className={auth.passwordInput}
             />
-
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
@@ -235,7 +242,6 @@ export default function RegisterPage() {
           <label htmlFor="confirm-password" className={auth.label}>
             Konfirmasi Password
           </label>
-
           <div className={auth.passwordWrap}>
             <input
               id="confirm-password"
@@ -246,7 +252,6 @@ export default function RegisterPage() {
               autoComplete="new-password"
               className={auth.passwordInput}
             />
-
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -269,8 +274,10 @@ export default function RegisterPage() {
             </p>
           )}
 
-          <button type="submit" className={auth.submit}>
-            Daftar sebagai {role === "buyer" ? "Buyer" : "Organizer"}
+          <button type="submit" disabled={loading} className={auth.submit}>
+            {loading
+              ? "Mendaftarkan..."
+              : `Daftar sebagai ${role === "buyer" ? "Buyer" : "Organizer"}`}
           </button>
         </form>
 
@@ -285,4 +292,4 @@ export default function RegisterPage() {
       <p className={auth.footer}>© 2026 ENCORE. All rights reserved.</p>
     </main>
   );
-}
+} 

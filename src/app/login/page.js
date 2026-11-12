@@ -1,10 +1,10 @@
-
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth } from "../../components/auth-styles";
+import { supabase } from "../../lib/supabase";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,24 +13,29 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const savedEmail = localStorage.getItem("encoreRememberEmail");
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRemember(true);
+    }
+  }, []);
 
   const getRedirectPath = () => {
     const params = new URLSearchParams(window.location.search);
     const redirect = params.get("redirect");
 
-    if (
-      redirect &&
-      redirect.startsWith("/") &&
-      !redirect.startsWith("//")
-    ) {
+    if (redirect && redirect.startsWith("/") && !redirect.startsWith("//")) {
       return redirect;
     }
 
     return null;
   };
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
 
@@ -40,166 +45,113 @@ export default function LoginPage() {
     }
 
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
     if (!emailPattern.test(email.trim())) {
       setError("Format email tidak valid.");
       return;
     }
 
+    setLoading(true);
     const normalizedEmail = email.trim().toLowerCase();
     const redirectPath = getRedirectPath();
 
     try {
-      let user = null;
-
-      // DEMO BUYER
-      if (
-        normalizedEmail === "demo@encore.com" &&
-        password === "encore123"
-      ) {
-        user = {
-          id: "demo-buyer",
-          name: "Demo Buyer",
+      // 1. Login via Supabase Auth
+      const { data: authData, error: authError } =
+        await supabase.auth.signInWithPassword({
           email: normalizedEmail,
-          role: "buyer",
-          status: "active",
-        };
-      }
+          password,
+        });
 
-      // DEMO ADMIN
-      else if (
-        normalizedEmail === "admin@encore.com" &&
-        password === "admin123"
-      ) {
-        user = {
-          id: "admin-encore",
-          name: "ENCORE Admin",
-          email: normalizedEmail,
-          role: "admin",
-          status: "active",
-        };
-      }
-
-      // AKUN REGISTER DAN PETUGAS
-      else {
-        const users = JSON.parse(
-          localStorage.getItem("encoreUsers") || "[]"
-        );
-
-        if (!Array.isArray(users)) {
-          setError("Data pengguna tidak valid.");
-          return;
-        }
-
-        user = users.find(
-          (item) =>
-            item.email?.toLowerCase() === normalizedEmail &&
-            item.password === password
-        );
-      }
-
-      // CEK AKUN
-      if (!user) {
+      if (authError || !authData?.user) {
         setError("Email atau password salah.");
         return;
       }
 
-      // CEK STATUS ORGANIZER
-      if (
-        user.role === "organizer" &&
-        user.status !== "active"
-      ) {
+      // 2. Ambil profil dan role dari tabel 'profiles'
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", authData.user.id)
+        .single();
+
+      if (profileError || !profile) {
+        await supabase.auth.signOut();
+        setError("Data profil pengguna tidak ditemukan di database.");
+        return;
+      }
+
+      // 3. Cek status persetujuan Organizer & Petugas
+      if (profile.role === "organizer" && profile.status !== "active") {
+        await supabase.auth.signOut();
         setError(
-          user.status === "rejected"
+          profile.status === "rejected"
             ? "Pendaftaran Organizer kamu ditolak oleh Admin."
             : "Akun Organizer kamu masih menunggu persetujuan Admin."
         );
         return;
       }
 
-      // CEK STATUS PETUGAS
-      if (
-        user.role === "checkin" &&
-        user.status !== "active"
-      ) {
+      if (profile.role === "checkin" && profile.status !== "active") {
+        await supabase.auth.signOut();
         setError(
           "Akun Petugas Check-in kamu belum aktif atau sudah dinonaktifkan."
         );
         return;
       }
 
-      // CEK ROLE
-      const allowedRoles = [
-        "buyer",
-        "organizer",
-        "checkin",
-        "admin",
-      ];
-
-      if (!allowedRoles.includes(user.role)) {
+      const allowedRoles = ["buyer", "organizer", "checkin", "admin"];
+      if (!allowedRoles.includes(profile.role)) {
+        await supabase.auth.signOut();
         setError("Role akun tidak dikenali.");
         return;
       }
 
-      // SIMPAN SESSION SIMULASI
+      // 4. Sinkronkan ke localStorage agar halaman lain yang belum dimigrasi tetap terbaca
       const currentUser = {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        organization: user.organization || "",
-        organizerId: user.organizerId || "",
-        eventIds: Array.isArray(user.eventIds)
-          ? user.eventIds
-          : [],
-        status: user.status,
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        phone: profile.phone || "",
+        role: profile.role,
+        organization: profile.organization || "",
+        organizerId: profile.organizer_id || "",
+        status: profile.status,
       };
 
-      localStorage.setItem(
-        "encoreCurrentUser",
-        JSON.stringify(currentUser)
-      );
+      localStorage.setItem("encoreCurrentUser", JSON.stringify(currentUser));
 
-      // INGAT EMAIL
       if (remember) {
-        localStorage.setItem(
-          "encoreRememberEmail",
-          normalizedEmail
-        );
+        localStorage.setItem("encoreRememberEmail", normalizedEmail);
       } else {
         localStorage.removeItem("encoreRememberEmail");
       }
 
-      // REDIRECT BERDASARKAN ROLE
-      switch (user.role) {
+      // 5. Redirect sesuai role
+      switch (profile.role) {
         case "admin":
           router.push("/admin/dashboard");
           break;
-
         case "organizer":
           router.push("/organizer/dashboard");
           break;
-
         case "checkin":
           router.push("/organizer/checkin");
           break;
-
         case "buyer":
-          router.push(
-            redirectPath || "/buyer/dashboard"
-          );
+          router.push(redirectPath || "/buyer/dashboard");
           break;
-
         default:
           setError("Role akun tidak dikenali.");
       }
     } catch (err) {
       console.error("Login error:", err);
       setError("Terjadi kesalahan. Silakan coba kembali.");
+    } finally {
+      setLoading(false);
     }
   };
 
-    return (
+  return (
     <main className={auth.page}>
       <Link href="/" className={auth.logo}>
         EN<span className={auth.logoAccent}>CORE</span>
@@ -208,9 +160,7 @@ export default function LoginPage() {
       <div className={auth.card}>
         <div className={auth.heading}>
           <span className={auth.eyebrow}>WELCOME BACK</span>
-
           <h1 className={auth.title}>Selamat Datang Kembali</h1>
-
           <p className={auth.subtitle}>
             Masuk ke akun ENCORE untuk melanjutkan pengalaman konsermu.
           </p>
@@ -220,7 +170,6 @@ export default function LoginPage() {
           <label htmlFor="email" className={auth.label}>
             Email
           </label>
-
           <input
             id="email"
             type="email"
@@ -234,7 +183,6 @@ export default function LoginPage() {
           <label htmlFor="password" className={auth.label}>
             Password
           </label>
-
           <div className={auth.passwordWrap}>
             <input
               id="password"
@@ -245,7 +193,6 @@ export default function LoginPage() {
               autoComplete="current-password"
               className={auth.passwordInput}
             />
-
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
@@ -277,8 +224,8 @@ export default function LoginPage() {
             </p>
           )}
 
-          <button type="submit" className={auth.submit}>
-            Masuk
+          <button type="submit" disabled={loading} className={auth.submit}>
+            {loading ? "Memproses..." : "Masuk"}
           </button>
         </form>
 

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -26,11 +25,8 @@ export default function BuyerOrdersPage() {
       const myOrders = allOrders.filter(
         (order) =>
           String(order.userId) === String(user.id) ||
-          (
-            order.buyerEmail &&
-            order.buyerEmail.toLowerCase() ===
-              (user.email || "").toLowerCase()
-          )
+          (order.buyerEmail &&
+            order.buyerEmail.toLowerCase() === (user.email || "").toLowerCase())
       );
 
       setOrders(myOrders);
@@ -68,9 +64,7 @@ export default function BuyerOrdersPage() {
       return "Menunggu Pembayaran";
     }
 
-    if (
-      ["failed", "cancelled", "canceled", "expire"].includes(status)
-    ) {
+    if (["failed", "cancelled", "canceled", "expire"].includes(status)) {
       return "Gagal / Dibatalkan";
     }
 
@@ -79,32 +73,36 @@ export default function BuyerOrdersPage() {
 
   return (
     <BuyerAccountLayout>
-      <div className="buyer-panel-heading">
-        <span className="buyer-panel-eyebrow">
+      <div className="mb-[25px]">
+        <span className="text-[11px] font-bold tracking-[2px] text-[#bd91ff]">
           AKUN ENCORE
         </span>
 
-        <h1>Transaksi Saya</h1>
+        <h1 className="my-[9px] font-heading text-[27px] font-bold text-white">
+          Transaksi Saya
+        </h1>
 
-        <p>
+        <p className="text-[13px] text-[#b9abc9]">
           Lihat riwayat pemesanan dan pembayaran tiket konser kamu.
         </p>
       </div>
 
       {loading ? (
-        <div className="buyer-empty-state">
+        <div className="rounded-2xl border border-[#382a49] bg-[#21172e] px-5 py-[70px] text-center text-sm text-[#b9abc9]">
           Memuat transaksi...
         </div>
       ) : orders.length === 0 ? (
-        <div className="buyer-empty-state">
-          <div className="buyer-empty-icon">▤</div>
-          <h3>Belum Ada Transaksi</h3>
-          <p>
+        <div className="rounded-2xl border border-[#382a49] bg-[#21172e] px-5 py-[70px] text-center">
+          <div className="mb-[15px] text-4xl text-[#c69bff]">▤</div>
+          <h3 className="mb-[9px] font-heading text-lg font-bold text-white">
+            Belum Ada Transaksi
+          </h3>
+          <p className="text-[13px] text-[#b9abc9]">
             Pesanan konser yang kamu buat akan muncul di halaman ini.
           </p>
         </div>
       ) : (
-        <div className="buyer-order-list">
+        <div className="flex flex-col gap-4">
           {orders
             .slice()
             .reverse()
@@ -114,68 +112,77 @@ export default function BuyerOrdersPage() {
 
               return (
                 <article
-                  className="buyer-order-card"
+                  className="rounded-2xl border border-[#382a49] bg-[#21172e] p-6 max-[550px]:p-4"
                   key={order.id || index}
                 >
-                  <div className="buyer-order-header">
-                    <div>
-                      <span>Nomor Pesanan</span>
-                      <strong>
+                  <div className="flex items-center justify-between gap-3 border-b border-[#49365b] pb-4 max-[500px]:flex-col max-[500px]:items-start">
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-xs text-[#b9abc9]">
+                        Nomor Pesanan
+                      </span>
+                      <strong className="text-[13px] [overflow-wrap:anywhere] text-white">
                         {order.id || `ORDER-${index + 1}`}
                       </strong>
                     </div>
 
                     <span
-                      className={`buyer-order-status ${
-                        successful ? "success" : ""
+                      className={`rounded-[20px] px-3 py-[7px] text-center text-[11px] font-medium ${
+                        successful
+                          ? "bg-[#244534] text-[#a4edc0]"
+                          : "bg-[#50391d] text-[#ffd38c]"
                       }`}
                     >
                       {status}
                     </span>
                   </div>
 
-                  <div className="buyer-order-content">
+                  <div className="flex items-center gap-[18px] py-5">
                     {order.concertImage && (
                       <img
                         src={order.concertImage}
                         alt={order.concertTitle || "Konser"}
+                        className="h-[120px] w-[110px] shrink-0 rounded-[10px] object-cover max-[550px]:h-[100px] max-[550px]:w-[85px]"
                       />
                     )}
 
-                    <div className="buyer-order-info">
-                      <h3>
+                    <div className="min-w-0">
+                      <h3 className="m-0 mb-2.5 font-heading text-[17px] font-bold text-white max-[550px]:text-sm">
                         {order.concertTitle || "Konser ENCORE"}
                       </h3>
 
-                      <p>
+                      <p className="my-1.5 text-xs text-[#b9abc9]">
                         {order.concertDate || "-"}
                       </p>
 
-                      <p>
+                      <p className="my-1.5 text-xs text-[#b9abc9]">
                         {order.concertLocation || "-"}
                       </p>
 
-                      <p>
+                      <p className="my-1.5 text-xs text-[#b9abc9]">
                         Kategori: {order.ticketName || "Tiket"}
                       </p>
 
-                      <p>
-                        Jumlah:{" "}
-                        {order.ticketQuantity || order.quantity || 1} tiket
+                      <p className="my-1.5 text-xs text-[#b9abc9]">
+                        Jumlah: {order.ticketQuantity || order.quantity || 1}{" "}
+                        tiket
                       </p>
                     </div>
                   </div>
 
-                  <div className="buyer-order-payment">
-                    <span>Metode Pembayaran</span>
-                    <strong>
+                  <div className="flex items-center justify-between gap-3 border-t border-[#49365b] py-[15px]">
+                    <span className="text-xs text-[#b9abc9]">
+                      Metode Pembayaran
+                    </span>
+                    <strong className="text-right text-[13px] text-[#c69bff]">
                       {getPaymentMethod(order.paymentMethod)}
                     </strong>
                   </div>
 
-                  <div className="buyer-order-footer">
-                    <span>Total Pembayaran</span>
-                    <strong>
+                  <div className="flex items-center justify-between gap-3 border-t border-[#49365b] pt-4">
+                    <span className="text-xs text-[#b9abc9]">
+                      Total Pembayaran
+                    </span>
+                    <strong className="text-[19px] text-[#c69bff] max-[550px]:text-[15px]">
                       {formatPrice(order.total)}
                     </strong>
                   </div>
@@ -184,162 +191,6 @@ export default function BuyerOrdersPage() {
             })}
         </div>
       )}
-
-      <style jsx>{`
-        .buyer-order-list {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .buyer-order-card {
-          padding: 24px;
-          border: 1px solid #382a49;
-          border-radius: 16px;
-          background: #21172e;
-        }
-
-        .buyer-order-header,
-        .buyer-order-footer,
-        .buyer-order-payment {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-        }
-
-        .buyer-order-header {
-          padding-bottom: 16px;
-          border-bottom: 1px solid #49365b;
-        }
-
-        .buyer-order-header div {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-
-        .buyer-order-header div span,
-        .buyer-order-footer span,
-        .buyer-order-payment span {
-          color: #b9abc9;
-          font-size: 12px;
-        }
-
-        .buyer-order-header div strong {
-          font-size: 13px;
-          overflow-wrap: anywhere;
-        }
-
-        .buyer-order-status {
-          padding: 7px 12px;
-          border-radius: 20px;
-          background: #50391d;
-          color: #ffd38c;
-          font-size: 11px;
-          text-align: center;
-        }
-
-        .buyer-order-status.success {
-          background: #244534;
-          color: #a4edc0;
-        }
-
-        .buyer-order-content {
-          display: flex;
-          align-items: center;
-          gap: 18px;
-          padding: 20px 0;
-        }
-
-        .buyer-order-content img {
-          width: 110px;
-          height: 120px;
-          flex-shrink: 0;
-          border-radius: 10px;
-          object-fit: cover;
-        }
-
-        .buyer-order-info {
-          min-width: 0;
-        }
-
-        .buyer-order-info h3 {
-          margin: 0 0 10px;
-          color: #fff;
-          font-size: 17px;
-        }
-
-        .buyer-order-info p {
-          margin: 6px 0;
-          color: #b9abc9;
-          font-size: 12px;
-        }
-
-        .buyer-order-payment {
-          padding: 15px 0;
-          border-top: 1px solid #49365b;
-        }
-
-        .buyer-order-payment strong {
-          color: #c69bff;
-          font-size: 13px;
-          text-align: right;
-        }
-
-        .buyer-order-footer {
-          padding-top: 16px;
-          border-top: 1px solid #49365b;
-        }
-
-        .buyer-order-footer strong {
-          color: #c69bff;
-          font-size: 19px;
-        }
-
-        .buyer-empty-state {
-          padding: 70px 20px;
-          border: 1px solid #382a49;
-          border-radius: 16px;
-          background: #21172e;
-          text-align: center;
-        }
-
-        .buyer-empty-icon {
-          margin-bottom: 15px;
-          color: #c69bff;
-          font-size: 36px;
-        }
-
-        .buyer-empty-state h3 {
-          margin-bottom: 9px;
-          color: #fff;
-        }
-
-        .buyer-empty-state p {
-          color: #b9abc9;
-          font-size: 13px;
-        }
-
-        @media (max-width: 550px) {
-          .buyer-order-card {
-            padding: 16px;
-          }
-
-          .buyer-order-content img {
-            width: 85px;
-            height: 100px;
-          }
-
-          .buyer-order-info h3 {
-            font-size: 14px;
-          }
-
-          .buyer-order-footer strong {
-            font-size: 15px;
-          }
-        }
-      `}</style>
     </BuyerAccountLayout>
   );
 }

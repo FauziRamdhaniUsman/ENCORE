@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -66,6 +65,9 @@ const faqs = [
   },
 ];
 
+const fieldInput =
+  "w-full rounded-[7px] border border-[#493d60] bg-[#090714e0] px-3.5 py-3 text-xs text-white outline-none placeholder:text-[#91889f] focus:border-primary-light focus:shadow-[0_0_0_3px_#8b5cf620]";
+
 export default function ContactPage() {
   const [formData, setFormData] = useState({
     name: "",
@@ -106,100 +108,93 @@ export default function ContactPage() {
       return;
     }
 
-    const subject = encodeURIComponent(
-      `[ENCORE] ${formData.category}`
-    );
+    const subject = encodeURIComponent(`[ENCORE] ${formData.category}`);
 
     const body = encodeURIComponent(
       `Halo Tim ENCORE,\n\n` +
-      `Nama: ${formData.name}\n` +
-      `Email: ${formData.email}\n` +
-      `Kategori: ${formData.category}\n\n` +
-      `Pesan:\n${formData.message}`
+        `Nama: ${formData.name}\n` +
+        `Email: ${formData.email}\n` +
+        `Kategori: ${formData.category}\n\n` +
+        `Pesan:\n${formData.message}`
     );
 
-    window.location.href =
-      `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
 
-    setNotification(
-      "Aplikasi email akan dibuka. Silakan kirim pesanmu."
-    );
+    setNotification("Aplikasi email akan dibuka. Silakan kirim pesanmu.");
   };
 
   return (
-    <main className="encore-contact-page">
-
+    <main className="relative isolate min-h-screen w-full overflow-hidden bg-background text-white">
       {/* FULL PAGE BACKGROUND */}
-
-      <div className="contact-background" />
-      <div className="contact-background-overlay" />
+      <div
+        className="pointer-events-none absolute inset-0 -z-20 bg-cover bg-top bg-no-repeat"
+        style={{ backgroundImage: 'url("/images/bg%20concerts.jpg")' }}
+      />
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(9,7,20,0.58)_0%,rgba(9,7,20,0.72)_30%,rgba(9,7,20,0.82)_65%,rgba(9,7,20,0.93)_100%)]" />
 
       {/* CONTACT HERO */}
-
-      <section className="contact-hero">
-        <div className="contact-hero-content">
-
-          <h1>
-            Let's Talk <span>with Us</span>
+      <section className="relative z-[1] flex min-h-[245px] items-center justify-center bg-transparent px-[7%] pt-[55px] pb-[30px] text-center max-[760px]:min-h-[220px] max-[760px]:px-[6%] max-[760px]:pt-[50px] max-[760px]:pb-[25px]">
+        <div>
+          <h1 className="m-0 font-heading text-[clamp(34px,4.5vw,49px)] leading-tight font-extrabold tracking-[-1.5px] max-[760px]:text-[35px]">
+            Let's Talk <span className="text-primary-light">with Us</span>
           </h1>
 
-          <p>
-            Ada pertanyaan atau ingin bekerja sama?
-            Kami siap membantu.
+          <p className="mx-auto mt-3 mb-0 text-[13px] leading-[1.8] text-[#d0c8df]">
+            Ada pertanyaan atau ingin bekerja sama? Kami siap membantu.
           </p>
-
         </div>
       </section>
 
       {/* CONTACT OPTIONS */}
-
-      <section className="contact-options-section">
-
-        <div className="contact-options">
-
+      <section className="relative z-[1] bg-transparent px-[7%] pt-[15px] pb-[55px] max-[760px]:pt-2.5 max-[760px]:pb-10">
+        <div className="mx-auto grid max-w-[1050px] grid-cols-3 gap-[35px] max-[760px]:grid-cols-1 max-[760px]:gap-[15px]">
           {contactOptions.map((item) => (
-            <div className="contact-option" key={item.title}>
-
-              <div className="contact-option-icon">
+            <div
+              className="flex items-start gap-[15px] border-0 bg-transparent py-2.5"
+              key={item.title}
+            >
+              <div className="shrink-0 text-[27px] leading-[1.3] text-[#b69aff]">
                 {item.icon}
               </div>
 
-              <div className="contact-option-content">
-                <h2>{item.title}</h2>
-                <p>{item.description}</p>
+              <div>
+                <h2 className="m-0 mb-[7px] font-heading text-base font-bold">
+                  {item.title}
+                </h2>
+                <p className="m-0 text-xs leading-[1.8] text-white/78">
+                  {item.description}
+                </p>
               </div>
-
             </div>
           ))}
-
         </div>
-
       </section>
 
       {/* SEND MESSAGE */}
-
       <section
-        className="contact-form-section"
+        className="relative z-[1] bg-transparent px-[7%] pt-[45px] pb-[60px] max-[760px]:px-[5%] max-[760px]:pt-[35px] max-[760px]:pb-[45px]"
         id="contact-form"
       >
+        <div className="mx-auto w-full max-w-[1050px] rounded-[13px] border border-primary-light/30 bg-[#110c20d6] px-[42px] py-8 backdrop-blur-md max-[760px]:px-[18px] max-[760px]:py-6">
+          <div className="mb-[23px]">
+            <h2 className="m-0 font-heading text-[27px] font-extrabold max-[760px]:text-2xl">
+              Send a Message
+            </h2>
 
-        <div className="contact-form-card">
-
-          <div className="contact-form-heading">
-            <h2>Send a Message</h2>
-
-            <p>
+            <p className="mt-[7px] text-xs text-[#c0b8d0]">
               Sampaikan pertanyaan atau pesanmu kepada tim ENCORE.
             </p>
           </div>
 
           <form
-            className="contact-form"
+            className="grid grid-cols-2 gap-x-[22px] gap-y-[17px] max-[760px]:grid-cols-1 max-[760px]:gap-[15px]"
             onSubmit={handleSubmit}
           >
-
-            <div className="contact-field">
-              <label htmlFor="contact-name">
+            <div className="flex min-w-0 flex-col gap-2">
+              <label
+                htmlFor="contact-name"
+                className="text-xs font-semibold text-[#eee8f8]"
+              >
                 Nama Lengkap *
               </label>
 
@@ -213,11 +208,15 @@ export default function ContactPage() {
                 autoComplete="name"
                 maxLength={100}
                 required
+                className={`${fieldInput} min-h-[44px]`}
               />
             </div>
 
-            <div className="contact-field">
-              <label htmlFor="contact-email">
+            <div className="flex min-w-0 flex-col gap-2">
+              <label
+                htmlFor="contact-email"
+                className="text-xs font-semibold text-[#eee8f8]"
+              >
                 Email *
               </label>
 
@@ -231,11 +230,15 @@ export default function ContactPage() {
                 autoComplete="email"
                 maxLength={254}
                 required
+                className={`${fieldInput} min-h-[44px]`}
               />
             </div>
 
-            <div className="contact-field">
-              <label htmlFor="contact-category">
+            <div className="flex min-w-0 flex-col gap-2">
+              <label
+                htmlFor="contact-category"
+                className="text-xs font-semibold text-[#eee8f8]"
+              >
                 Kategori *
               </label>
 
@@ -245,6 +248,7 @@ export default function ContactPage() {
                 value={formData.category}
                 onChange={handleChange}
                 required
+                className={`${fieldInput} min-h-[44px] [&_option]:bg-surface [&_option]:text-white`}
               >
                 <option value="" disabled>
                   Pilih kategori
@@ -258,8 +262,11 @@ export default function ContactPage() {
               </select>
             </div>
 
-            <div className="contact-field contact-message-field">
-              <label htmlFor="contact-message">
+            <div className="col-span-full flex min-w-0 flex-col gap-2 max-[760px]:col-auto">
+              <label
+                htmlFor="contact-message"
+                className="text-xs font-semibold text-[#eee8f8]"
+              >
                 Pesan *
               </label>
 
@@ -272,591 +279,99 @@ export default function ContactPage() {
                 onChange={handleChange}
                 maxLength={2000}
                 required
+                className={`${fieldInput} min-h-[120px] resize-y leading-[1.7]`}
               />
 
-              <small>
+              <small className="self-end text-[10px] text-[#aaa2bd]">
                 {formData.message.length}/2000
               </small>
             </div>
 
             {notification && (
-              <p className="contact-notification" role="status">
+              <p
+                className="col-span-full rounded-[7px] bg-[#8b5cf625] px-[13px] py-[11px] text-xs leading-[1.7] text-[#e0d5ff] max-[760px]:col-auto"
+                role="status"
+              >
                 {notification}
               </p>
             )}
 
             <button
               type="submit"
-              className="contact-submit-btn"
+              className="col-span-full flex min-h-[45px] w-full cursor-pointer items-center justify-center gap-[13px] rounded-[7px] border-0 bg-primary text-xs font-bold text-white transition duration-250 hover:bg-[#7042d4] max-[760px]:col-auto"
             >
-              Send Message <span>›</span>
+              Send Message <span className="text-xl">›</span>
             </button>
-
           </form>
-
         </div>
-
       </section>
 
       {/* FREQUENTLY ASKED QUESTIONS */}
+      <section className="relative z-[1] bg-transparent px-[7%] pt-[50px] pb-[70px] max-[760px]:px-[6%] max-[760px]:pt-10 max-[760px]:pb-[55px]">
+        <div className="mx-auto mb-7 max-w-[700px] text-center">
+          <h2 className="m-0 font-heading text-[clamp(25px,3.5vw,35px)] font-extrabold max-[760px]:text-[25px]">
+            Frequently Asked Questions
+          </h2>
 
-      <section className="contact-faq-section">
-
-        <div className="contact-faq-heading">
-
-          <h2>Frequently Asked Questions</h2>
-
-          <p>
+          <p className="mt-[9px] text-xs text-[#c0b8d0]">
             Temukan jawaban atas pertanyaan seputar ENCORE.
           </p>
-
         </div>
 
-        <div className="contact-faq-list">
-
+        <div className="mx-auto flex max-w-[850px] flex-col gap-2.5">
           {faqs.map((faq, index) => {
             const isOpen = openFAQ === index;
 
             return (
               <article
-                className={`contact-faq-item ${
-                  isOpen ? "open" : ""
+                className={`overflow-hidden rounded-lg border bg-[#110c20d6] backdrop-blur-[10px] ${
+                  isOpen ? "border-primary" : "border-primary-light/25"
                 }`}
                 key={faq.question}
               >
-
                 <button
                   type="button"
-                  className="contact-faq-question"
-                  onClick={() =>
-                    setOpenFAQ(isOpen ? null : index)
-                  }
+                  className="flex min-h-[58px] w-full cursor-pointer items-center justify-between gap-[18px] border-0 bg-transparent px-[19px] py-[15px] text-left text-white max-[760px]:p-3.5"
+                  onClick={() => setOpenFAQ(isOpen ? null : index)}
                   aria-expanded={isOpen}
                 >
+                  <strong className="text-[13px] leading-[1.6] font-semibold max-[760px]:text-xs">
+                    {faq.question}
+                  </strong>
 
-                  <strong>{faq.question}</strong>
-
-                  <span className="contact-faq-toggle">
+                  <span className="flex size-[26px] shrink-0 items-center justify-center rounded-md bg-[#8b5cf625] text-[21px] text-[#c4b5fd]">
                     {isOpen ? "‹" : "›"}
                   </span>
-
                 </button>
 
                 {isOpen && (
-                  <div className="contact-faq-answer">
-                    <p>{faq.answer}</p>
+                  <div className="pr-12 pb-4 pl-[19px] max-[760px]:px-3.5 max-[760px]:pb-[15px]">
+                    <p className="m-0 text-xs leading-[1.8] text-[#c0b8d0]">
+                      {faq.answer}
+                    </p>
                   </div>
                 )}
-
               </article>
             );
           })}
-
         </div>
-
       </section>
 
-      {/* FOOTER */}
-
-      <footer className="footer">
-        <Link href="/" className="logo">
-          EN<span>CORE</span>
+      {/* FOOTER (disembunyikan otomatis oleh SiteShell) */}
+      <footer className="footer relative z-[1] flex flex-wrap items-center justify-between gap-5 border-t border-[#ffffff12] !bg-transparent px-[7%] py-[35px] max-[700px]:flex-col max-[700px]:items-start max-[700px]:px-[5%] max-[700px]:py-[30px]">
+        <Link
+          href="/"
+          className="font-heading text-[27px] font-extrabold tracking-[-1px] text-[#f8fafc]"
+        >
+          EN<span className="text-primary-light">CORE</span>
         </Link>
 
-        <p>Temukan pengalaman. Ciptakan kenangan.</p>
+        <p className="text-[13px] text-muted">
+          Temukan pengalaman. Ciptakan kenangan.
+        </p>
 
-        <small>© 2026 ENCORE</small>
+        <small className="text-[13px] text-muted">© 2026 ENCORE</small>
       </footer>
-
-      {/* CONTACT PAGE CSS */}
-
-      <style jsx global>{`
-
-        /* =====================================
-           MAIN PAGE
-        ===================================== */
-
-        .encore-contact-page {
-          position: relative;
-          isolation: isolate;
-          width: 100%;
-          min-height: 100vh;
-          overflow: hidden;
-          background: #090714;
-          color: #ffffff;
-          font-family: inherit;
-        }
-
-        .encore-contact-page * {
-          box-sizing: border-box;
-        }
-
-        /* =====================================
-           FULL PAGE BACKGROUND
-        ===================================== */
-
-        .contact-background {
-          position: absolute;
-          z-index: -2;
-          inset: 0;
-
-          background-image: url("/images/bg%20concerts.jpg");
-          background-position: center top;
-          background-size: cover;
-          background-repeat: no-repeat;
-
-          pointer-events: none;
-        }
-
-        .contact-background-overlay {
-          position: absolute;
-          z-index: -1;
-          inset: 0;
-
-          background: linear-gradient(
-            180deg,
-            rgba(9, 7, 20, 0.58) 0%,
-            rgba(9, 7, 20, 0.72) 30%,
-            rgba(9, 7, 20, 0.82) 65%,
-            rgba(9, 7, 20, 0.93) 100%
-          );
-
-          pointer-events: none;
-        }
-
-        /* =====================================
-           SECTION BACKGROUND
-           SEMUA SECTION TRANSPARAN
-        ===================================== */
-
-        .encore-contact-page .contact-hero,
-        .encore-contact-page .contact-options-section,
-        .encore-contact-page .contact-form-section,
-        .encore-contact-page .contact-faq-section {
-          position: relative;
-          z-index: 1;
-          background: transparent !important;
-        }
-
-        /* =====================================
-           HERO
-        ===================================== */
-
-        .contact-hero {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-
-          min-height: 245px;
-          padding: 55px 7% 30px;
-
-          text-align: center;
-        }
-
-        .contact-hero h1 {
-          margin: 0;
-          font-size: clamp(34px, 4.5vw, 49px);
-          line-height: 1.2;
-          font-weight: 800;
-          letter-spacing: -1.5px;
-        }
-
-        .contact-hero h1 span {
-          color: #a78bfa;
-        }
-
-        .contact-hero p {
-          margin: 12px auto 0;
-          color: #d0c8df;
-          font-size: 13px;
-          line-height: 1.8;
-        }
-
-        /* =====================================
-           CONTACT OPTIONS
-        ===================================== */
-
-        .contact-options-section {
-          padding: 15px 7% 55px;
-        }
-
-        .contact-options {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 35px;
-
-          max-width: 1050px;
-          margin: 0 auto;
-        }
-
-        .contact-option {
-          display: flex;
-          align-items: flex-start;
-          gap: 15px;
-
-          padding: 10px 0;
-
-          background: transparent;
-          border: none;
-        }
-
-        .contact-option-icon {
-          flex-shrink: 0;
-          color: #b69aff;
-          font-size: 27px;
-          line-height: 1.3;
-        }
-
-        .contact-option-content h2 {
-          margin: 0 0 7px;
-          font-size: 16px;
-          font-weight: 700;
-        }
-
-        .contact-option-content p {
-          margin: 0;
-          color: rgba(255, 255, 255, 0.78);
-          font-size: 12px;
-          line-height: 1.8;
-        }
-
-        /* =====================================
-           SEND MESSAGE
-        ===================================== */
-
-        .contact-form-section {
-          padding: 45px 7% 60px;
-        }
-
-        .contact-form-card {
-          width: 100%;
-          max-width: 1050px;
-
-          margin: 0 auto;
-          padding: 32px 42px;
-
-          border: 1px solid rgba(167, 139, 250, 0.3);
-          border-radius: 13px;
-
-          background: rgba(17, 12, 32, 0.84);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-        }
-
-        .contact-form-heading {
-          margin-bottom: 23px;
-        }
-
-        .contact-form-heading h2 {
-          margin: 0;
-          font-size: 27px;
-          font-weight: 800;
-        }
-
-        .contact-form-heading p {
-          margin-top: 7px;
-          color: #c0b8d0;
-          font-size: 12px;
-        }
-
-        .contact-form {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 17px 22px;
-        }
-
-        .contact-field {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          min-width: 0;
-        }
-
-        .contact-field label {
-          color: #eee8f8;
-          font-size: 12px;
-          font-weight: 600;
-        }
-
-        .contact-field input,
-        .contact-field select,
-        .contact-field textarea {
-          width: 100%;
-          padding: 12px 14px;
-
-          border: 1px solid #493d60;
-          border-radius: 7px;
-          outline: none;
-
-          background: rgba(9, 7, 20, 0.88);
-          color: white;
-
-          font: inherit;
-          font-size: 12px;
-        }
-
-        .contact-field input,
-        .contact-field select {
-          min-height: 44px;
-        }
-
-        .contact-field textarea {
-          min-height: 120px;
-          resize: vertical;
-          line-height: 1.7;
-        }
-
-        .contact-field input::placeholder,
-        .contact-field textarea::placeholder {
-          color: #91889f;
-        }
-
-        .contact-field input:focus,
-        .contact-field select:focus,
-        .contact-field textarea:focus {
-          border-color: #a78bfa;
-          box-shadow: 0 0 0 3px #8b5cf620;
-        }
-
-        .contact-field select option {
-          background: #151126;
-          color: white;
-        }
-
-        .contact-field small {
-          align-self: flex-end;
-          color: #aaa2bd;
-          font-size: 10px;
-        }
-
-        .contact-message-field {
-          grid-column: 1 / -1;
-        }
-
-        .contact-notification {
-          grid-column: 1 / -1;
-          padding: 11px 13px;
-          border-radius: 7px;
-          background: #8b5cf625;
-          color: #e0d5ff;
-          font-size: 12px;
-          line-height: 1.7;
-        }
-
-        .contact-submit-btn {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 13px;
-
-          grid-column: 1 / -1;
-          width: 100%;
-          min-height: 45px;
-
-          border: none;
-          border-radius: 7px;
-
-          background: #8b5cf6;
-          color: white;
-
-          font: inherit;
-          font-size: 12px;
-          font-weight: 700;
-
-          cursor: pointer;
-          transition: 0.25s;
-        }
-
-        .contact-submit-btn:hover {
-          background: #7042d4;
-        }
-
-        .contact-submit-btn span {
-          font-size: 20px;
-        }
-
-        /* =====================================
-           FAQ
-        ===================================== */
-
-        .contact-faq-section {
-          padding: 50px 7% 70px;
-        }
-
-        .contact-faq-heading {
-          max-width: 700px;
-          margin: 0 auto 28px;
-          text-align: center;
-        }
-
-        .contact-faq-heading h2 {
-          margin: 0;
-          font-size: clamp(25px, 3.5vw, 35px);
-          font-weight: 800;
-        }
-
-        .contact-faq-heading p {
-          margin-top: 9px;
-          color: #c0b8d0;
-          font-size: 12px;
-        }
-
-        .contact-faq-list {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-
-          max-width: 850px;
-          margin: 0 auto;
-        }
-
-        .contact-faq-item {
-          overflow: hidden;
-
-          border: 1px solid rgba(167, 139, 250, 0.25);
-          border-radius: 8px;
-
-          background: rgba(17, 12, 32, 0.84);
-          backdrop-filter: blur(10px);
-          -webkit-backdrop-filter: blur(10px);
-        }
-
-        .contact-faq-item.open {
-          border-color: #8b5cf6;
-        }
-
-        .contact-faq-question {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 18px;
-
-          width: 100%;
-          min-height: 58px;
-          padding: 15px 19px;
-
-          border: none;
-          background: transparent;
-          color: white;
-
-          text-align: left;
-          cursor: pointer;
-        }
-
-        .contact-faq-question strong {
-          font-size: 13px;
-          font-weight: 600;
-          line-height: 1.6;
-        }
-
-        .contact-faq-toggle {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-
-          width: 26px;
-          height: 26px;
-
-          border-radius: 6px;
-          background: #8b5cf625;
-          color: #c4b5fd;
-
-          font-size: 21px;
-        }
-
-        .contact-faq-answer {
-          padding: 0 48px 16px 19px;
-        }
-
-        .contact-faq-answer p {
-          margin: 0;
-          color: #c0b8d0;
-          font-size: 12px;
-          line-height: 1.8;
-        }
-
-        /* =====================================
-           FOOTER
-        ===================================== */
-
-        .encore-contact-page .footer {
-          position: relative;
-          z-index: 1;
-          background: transparent !important;
-        }
-
-        /* =====================================
-           TABLET & MOBILE
-        ===================================== */
-
-        @media (max-width: 760px) {
-
-          .contact-hero {
-            min-height: 220px;
-            padding: 50px 6% 25px;
-          }
-
-          .contact-hero h1 {
-            font-size: 35px;
-          }
-
-          .contact-options-section {
-            padding: 10px 7% 40px;
-          }
-
-          .contact-options {
-            grid-template-columns: 1fr;
-            gap: 15px;
-          }
-
-          .contact-form-section {
-            padding: 35px 5% 45px;
-          }
-
-          .contact-form-card {
-            padding: 24px 18px;
-          }
-
-          .contact-form-heading h2 {
-            font-size: 24px;
-          }
-
-          .contact-form {
-            grid-template-columns: 1fr;
-            gap: 15px;
-          }
-
-          .contact-message-field,
-          .contact-notification,
-          .contact-submit-btn {
-            grid-column: auto;
-          }
-
-          .contact-faq-section {
-            padding: 40px 6% 55px;
-          }
-
-          .contact-faq-heading h2 {
-            font-size: 25px;
-          }
-
-          .contact-faq-question {
-            padding: 14px;
-          }
-
-          .contact-faq-question strong {
-            font-size: 12px;
-          }
-
-          .contact-faq-answer {
-            padding: 0 14px 15px;
-          }
-
-        }
-
-      `}</style>
-
     </main>
   );
 }

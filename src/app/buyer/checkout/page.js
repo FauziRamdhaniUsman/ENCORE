@@ -1,16 +1,20 @@
-
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { concerts, formatPrice } from "../../../data/concerts";
+import { supabase } from "../../../lib/supabase";
+
+const pageWrapperClass =
+  "min-h-screen bg-[linear-gradient(180deg,rgba(9,7,20,0.82),rgba(9,7,20,0.97)),url('/images/bg%20konser.jpg')] bg-cover bg-fixed bg-top px-[6%] py-[45px] text-white max-[800px]:bg-scroll max-[800px]:px-[5%] max-[800px]:py-[30px]";
 
 function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const concertId = searchParams.get("concertId");
+  const ticketTypeId = searchParams.get("ticketTypeId");
   const ticketIndex = Number(searchParams.get("ticketIndex") || 0);
   const quantity = Math.min(
     4,
@@ -18,6 +22,7 @@ function CheckoutContent() {
   );
 
   const [user, setUser] = useState(null);
+  const [concert, setConcert] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sameAsAccount, setSameAsAccount] = useState(true);
 
@@ -26,62 +31,134 @@ function CheckoutContent() {
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
 
-  const concert = useMemo(
-    () => concerts.find(
-      (item) => String(item.id) === String(concertId)
-    ),
-    [concertId]
-  );
+  useEffect(() => {
+    const initCheckout = async () => {
+      try {
+        // 1. Cek sesi login Buyer di Supabase Auth
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
+
+        if (!authUser) {
+          const returnUrl = window.location.pathname + window.location.search;
+          router.replace(`/login?redirect=${encodeURIComponent(returnUrl)}`);
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", authUser.id)
+          .single();
+
+        if (!profile || profile.role !== "buyer") {
+          router.replace("/login");
+          return;
+        }
+
+        setUser(profile);
+        setName(profile.name || "");
+        setEmail(profile.email || authUser.email || "");
+        setPhone(profile.phone || "");
+
+        // 2. Ambil detail konser (bawaan atau dari tabel 'events' Supabase)
+        if (!concertId) {
+          setLoading(false);
+          return;
+        }
+
+        const staticConcert = concerts.find(
+          (item) => String(item.id) === String(concertId)
+        );
+
+        if (staticConcert) {
+          setConcert(staticConcert);
+          setLoading(false);
+          return;
+        }
+
+        const { data: ev, error: evError } = await supabase
+          .from("events")
+          .select(
+            `
+            *,
+            ticket_types (
+              id,
+              name,
+              description,
+              price,
+              quota
+            )
+          `
+          )
+          .eq("id", concertId)
+          .maybeSingle();
+
+        if (!evError && ev) {
+          const parsedDate = ev.event_date ? new Date(ev.event_date) : null;
+          const formattedDate =
+            parsedDate && !Number.isNaN(parsedDate.getTime())
+              ? parsedDate.toLocaleDateString("id-ID", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })
+              : ev.event_date || "-";
+
+          const mappedTickets = Array.isArray(ev.ticket_types)
+            ? ev.ticket_types
+                .sort((a, b) => Number(a.price || 0) - Number(b.price || 0))
+                .map((t) => ({
+                  id: t.id,
+                  name: t.name,
+                  description: t.description || "General admission",
+                  price: Number(t.price || 0),
+                  quota: Number(t.quota || 0),
+                }))
+            : [];
+
+          setConcert({
+            id: ev.id,
+            isSupabase: true,
+            title: ev.title,
+            image: ev.image_url || "/images/default-concert.jpg",
+            date: formattedDate,
+            location: ev.location || ev.venue || "Indonesia",
+            venue: ev.venue || "",
+            price: mappedTickets[0]?.price || 0,
+            tickets: mappedTickets,
+          });
+        }
+      } catch (err) {
+        console.error("Gagal memuat checkout:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initCheckout();
+  }, [concertId, router]);
 
   const tickets = concert?.tickets?.length
     ? concert.tickets
     : concert
-      ? [{
-          name: "Regular",
-          description: "General admission",
-          price: concert.price,
-        }]
+      ? [
+          {
+            name: "Regular",
+            description: "General admission",
+            price: concert.price,
+          },
+        ]
       : [];
 
-  const selectedTicket = tickets[ticketIndex] || tickets[0];
+  const selectedTicket =
+    (ticketTypeId && tickets.find((t) => String(t.id) === String(ticketTypeId))) ||
+    tickets[ticketIndex] ||
+    tickets[0];
 
-  const subtotal = selectedTicket
-    ? selectedTicket.price * quantity
-    : 0;
-
+  const subtotal = selectedTicket ? selectedTicket.price * quantity : 0;
   const serviceFee = Math.round(subtotal * 0.05);
   const total = subtotal + serviceFee;
-
-  useEffect(() => {
-    try {
-      const currentUser = JSON.parse(
-        localStorage.getItem("encoreCurrentUser") || "null"
-      );
-
-      if (!currentUser) {
-        const returnUrl =
-          window.location.pathname + window.location.search;
-
-        router.replace(
-          `/login?redirect=${encodeURIComponent(returnUrl)}`
-        );
-        return;
-      }
-
-      if (currentUser.role !== "buyer") {
-        router.replace("/login");
-        return;
-      }
-
-      setUser(currentUser);
-      setName(currentUser.name || "");
-      setEmail(currentUser.email || "");
-      setPhone(currentUser.phone || "");
-      setLoading(false);
-    } catch {
-      router.replace("/login");
-    }
-  }, [router]);
 
   const handleSameAsAccount = (checked) => {
     setSameAsAccount(checked);
@@ -123,7 +200,6 @@ function CheckoutContent() {
       return;
     }
 
-    // DATA PESANAN
     const order = {
       id: `ENC-${Date.now()}`,
       userId: user?.id || null,
@@ -133,11 +209,13 @@ function CheckoutContent() {
       buyerPhone: phone.trim(),
 
       concertId: concert.id,
+      isSupabaseEvent: Boolean(concert.isSupabase),
       concertTitle: concert.title,
       concertImage: concert.image,
       concertDate: concert.date,
       concertLocation: concert.location,
 
+      ticketTypeId: selectedTicket.id || null,
       ticketName: selectedTicket.name,
       ticketPrice: selectedTicket.price,
 
@@ -156,11 +234,7 @@ function CheckoutContent() {
     };
 
     try {
-      localStorage.setItem(
-        "encorePendingOrder",
-        JSON.stringify(order)
-      );
-
+      localStorage.setItem("encorePendingOrder", JSON.stringify(order));
       router.push("/buyer/payment");
     } catch {
       setError("Pesanan gagal disimpan. Silakan coba kembali.");
@@ -169,19 +243,25 @@ function CheckoutContent() {
 
   if (loading) {
     return (
-      <main className="encore-checkout">
-        <p className="checkout-loading">Memuat checkout...</p>
+      <main className={pageWrapperClass}>
+        <p className="py-[100px] text-center text-[#c4b5fd]">
+          Memuat checkout...
+        </p>
       </main>
     );
   }
 
   if (!concert || !selectedTicket) {
     return (
-      <main className="encore-checkout">
-        <div className="checkout-empty">
-          <h2>Pesanan tidak ditemukan</h2>
-          <p>Silakan pilih konser terlebih dahulu.</p>
-          <Link href="/concerts">
+      <main className={pageWrapperClass}>
+        <div className="mx-auto my-[100px] max-w-[500px] rounded-[15px] border border-[#49316d] bg-[#110c20] p-[30px] text-center">
+          <h2 className="font-heading text-xl font-bold">
+            Pesanan tidak ditemukan
+          </h2>
+          <p className="my-[15px] text-sm text-[#aaa1bd]">
+            Silakan pilih konser terlebih dahulu.
+          </p>
+          <Link href="/concerts" className="text-sm text-[#c4b5fd] underline">
             Kembali ke daftar konser
           </Link>
         </div>
@@ -190,55 +270,76 @@ function CheckoutContent() {
   }
 
   return (
-    <main className="encore-checkout">
-      <div className="checkout-container">
+    <main className={pageWrapperClass}>
+      <div className="mx-auto max-w-[1180px]">
         <Link
           href={`/concerts/${concert.id}`}
-          className="checkout-back"
+          className="text-[13px] text-[#c4b5fd] hover:text-white"
         >
           ← Kembali ke detail konser
         </Link>
 
-        <header className="checkout-heading">
-          <span>ENCORE TICKETING</span>
-          <h1>Data Pemesan</h1>
-          <p>
-            Pastikan data pemesan sudah benar untuk
-            kelancaran proses pemesanan tiket.
+        <header className="my-7">
+          <span className="text-[11px] font-extrabold tracking-[2px] text-primary-light">
+            ENCORE TICKETING
+          </span>
+          <h1 className="my-[9px] font-heading text-[clamp(28px,4vw,38px)] font-bold">
+            Data Pemesan
+          </h1>
+          <p className="text-sm leading-[1.7] text-[#aaa1bd]">
+            Pastikan data pemesan sudah benar untuk kelancaran proses pemesanan
+            tiket.
           </p>
         </header>
 
-        <form className="checkout-layout" onSubmit={handleSubmit}>
-          <section className="checkout-form-card">
-            <div className="checkout-section-title">
-              <div>
-                <span>01</span>
-                <h2>Informasi Pemesan</h2>
+        <form
+          className="grid grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)] items-start gap-6 max-[800px]:grid-cols-1"
+          onSubmit={handleSubmit}
+        >
+          <section className="rounded-[17px] border border-[#49316d] bg-[#110c20f5] p-[27px] shadow-[0_12px_35px_#00000035] max-[800px]:p-[21px]">
+            <div className="mb-6">
+              <div className="flex items-center gap-[13px]">
+                <span className="grid size-[35px] place-items-center rounded-[9px] bg-[#8b5cf625] font-extrabold text-[#c4b5fd]">
+                  01
+                </span>
+                <h2 className="font-heading text-xl font-bold">
+                  Informasi Pemesan
+                </h2>
               </div>
-              <p>Lengkapi informasi kontak kamu.</p>
+              <p className="mt-[9px] ml-12 text-xs leading-[1.7] text-[#aaa1bd]">
+                Lengkapi informasi kontak kamu.
+              </p>
             </div>
 
-            <label className="same-account">
+            <label className="mb-[19px] flex cursor-pointer items-center gap-[11px] text-[13px] text-[#e8e0f5]">
               <input
                 type="checkbox"
                 checked={sameAsAccount}
-                onChange={(e) =>
-                  handleSameAsAccount(e.target.checked)
-                }
+                onChange={(e) => handleSameAsAccount(e.target.checked)}
+                className="peer pointer-events-none absolute opacity-0"
               />
-              <span className="custom-check">✓</span>
+              <span className="grid size-[22px] place-items-center rounded-full border border-[#625278] text-xs text-transparent transition peer-checked:border-primary-light peer-checked:bg-primary peer-checked:text-white">
+                ✓
+              </span>
               <span>Sama dengan data akun</span>
             </label>
 
-            <div className="checkout-info">
-              <span>ⓘ</span>
-              Data ini digunakan untuk konfirmasi pesanan
-              dan pengiriman e-ticket.
+            <div className="flex gap-2.5 rounded-[9px] bg-[#8b5cf619] px-[15px] py-[13px] text-[11px] leading-[1.6] text-[#c8b8e4]">
+              <span className="text-primary-light">ⓘ</span>
+              <span>
+                Data ini digunakan untuk konfirmasi pesanan dan pengiriman
+                e-ticket.
+              </span>
             </div>
 
-            <div className="checkout-fields">
-              <div className="checkout-field">
-                <label htmlFor="buyer-name">Nama Lengkap</label>
+            <div className="mt-[25px] flex flex-col gap-5">
+              <div className="flex flex-col gap-[9px]">
+                <label
+                  htmlFor="buyer-name"
+                  className="text-[13px] font-semibold text-[#eee9f8]"
+                >
+                  Nama Lengkap
+                </label>
                 <input
                   id="buyer-name"
                   type="text"
@@ -246,13 +347,21 @@ function CheckoutContent() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
+                  className="h-[54px] w-full rounded-[10px] border border-[#493d61] bg-[#0c0918] px-[17px] text-[13px] text-white outline-none placeholder:text-[#827990] focus:border-primary-light focus:shadow-[0_0_0_3px_#8b5cf620]"
                 />
               </div>
 
-              <div className="checkout-field">
-                <label htmlFor="buyer-phone">Nomor HP</label>
-                <div className="phone-input">
-                  <span className="phone-code">🇮🇩 +62</span>
+              <div className="flex flex-col gap-[9px]">
+                <label
+                  htmlFor="buyer-phone"
+                  className="text-[13px] font-semibold text-[#eee9f8]"
+                >
+                  Nomor HP
+                </label>
+                <div className="flex items-center overflow-hidden rounded-[10px] border border-[#493d61] bg-[#0c0918] focus-within:border-primary-light">
+                  <span className="border-r border-[#493d61] px-3.5 text-[13px] whitespace-nowrap text-[#d8c4ff]">
+                    🇮🇩 +62
+                  </span>
                   <input
                     id="buyer-phone"
                     type="tel"
@@ -260,12 +369,18 @@ function CheckoutContent() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     required
+                    className="h-[54px] w-full border-0 bg-transparent px-[17px] text-[13px] text-white outline-none placeholder:text-[#827990]"
                   />
                 </div>
               </div>
 
-              <div className="checkout-field">
-                <label htmlFor="buyer-email">Email</label>
+              <div className="flex flex-col gap-[9px]">
+                <label
+                  htmlFor="buyer-email"
+                  className="text-[13px] font-semibold text-[#eee9f8]"
+                >
+                  Email
+                </label>
                 <input
                   id="buyer-email"
                   type="email"
@@ -273,612 +388,164 @@ function CheckoutContent() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  className="h-[54px] w-full rounded-[10px] border border-[#493d61] bg-[#0c0918] px-[17px] text-[13px] text-white outline-none placeholder:text-[#827990] focus:border-primary-light focus:shadow-[0_0_0_3px_#8b5cf620]"
                 />
-                <small>
-                  E-ticket dan informasi pesanan akan
-                  dikirim ke email ini.
+                <small className="text-[11px] text-[#9990aa]">
+                  E-ticket dan informasi pesanan akan dikirim ke email ini.
                 </small>
               </div>
             </div>
 
             {error && (
-              <p className="checkout-error" role="alert">
+              <p className="mt-[18px] text-xs text-[#fca5a5]" role="alert">
                 {error}
               </p>
             )}
           </section>
 
-          <aside className="checkout-summary">
-            <div className="summary-event">
+          <aside className="rounded-[17px] border border-[#49316d] bg-[#110c20f5] p-[27px] shadow-[0_12px_35px_#00000035] max-[800px]:p-[21px]">
+            <div className="flex items-center gap-3.5">
               <img
                 src={concert.image || "/images/default-concert.jpg"}
                 alt={concert.title}
+                className="h-[75px] w-[65px] shrink-0 rounded-[9px] object-cover"
               />
 
-              <div className="summary-event-info">
-                <h3>{concert.title}</h3>
+              <div className="flex flex-1 items-start justify-between gap-2.5">
+                <h3 className="font-heading text-sm leading-normal font-bold">
+                  {concert.title}
+                </h3>
                 <button
                   type="button"
-                  onClick={() =>
-                    router.push(`/concerts/${concert.id}`)
-                  }
+                  onClick={() => router.push(`/concerts/${concert.id}`)}
+                  className="shrink-0 cursor-pointer border-0 bg-transparent text-xs font-bold text-primary-light hover:underline"
                 >
                   Detail
                 </button>
               </div>
             </div>
 
-            <div className="summary-divider" />
+            <div className="my-5 h-px bg-[#392e4d]" />
 
-            <div className="summary-category">
-              <strong>{selectedTicket.name}</strong>
+            <div>
+              <strong className="text-sm text-[#f5f1fc]">
+                {selectedTicket.name}
+              </strong>
             </div>
 
-            <div className="summary-ticket-count">
+            <div className="mt-[15px] flex items-center gap-[9px] text-[13px] text-[#f5f1fc]">
               {quantity} {selectedTicket.persons ? "Paket" : "Tiket"}
-              <span>•</span>
+              <span className="text-[#827990]">•</span>
               {selectedTicket.persons
                 ? `Peserta ${selectedTicket.persons * quantity}`
                 : `Pax ${quantity}`}
             </div>
 
-            <div className="summary-divider" />
+            <div className="my-5 h-px bg-[#392e4d]" />
 
-            <div className="summary-date">
-              <span>Tanggal Konser</span>
-              <strong>{concert.date}</strong>
+            <div className="flex flex-col gap-[7px]">
+              <span className="text-xs text-[#aaa1bd]">Tanggal Konser</span>
+              <strong className="text-sm text-[#f5f1fc]">{concert.date}</strong>
             </div>
 
-            <div className="summary-divider" />
+            <div className="my-5 h-px bg-[#392e4d]" />
 
-            <div className="summary-benefits">
-              <div>
-                <span>🚫</span>
-                <p>Refund not allowed</p>
+            <div className="my-[22px] flex flex-col gap-[19px]">
+              <div className="flex items-start gap-[13px]">
+                <span className="w-[23px] shrink-0 text-lg text-primary-light">
+                  🚫
+                </span>
+                <p className="text-[13px] leading-[1.6] text-[#eee9f8]">
+                  Refund not allowed
+                </p>
               </div>
-              <div>
-                <span>⚡</span>
-                <p>Instant Confirmation</p>
+              <div className="flex items-start gap-[13px]">
+                <span className="w-[23px] shrink-0 text-lg text-primary-light">
+                  ⚡
+                </span>
+                <p className="text-[13px] leading-[1.6] text-[#eee9f8]">
+                  Instant Confirmation
+                </p>
               </div>
-              <div>
-                <span>💺</span>
-                <p>
+              <div className="flex items-start gap-[13px]">
+                <span className="w-[23px] shrink-0 text-lg text-primary-light">
+                  💺
+                </span>
+                <p className="text-[13px] leading-[1.6] text-[#eee9f8]">
                   Seat assigned automatically
-                  <small>
-                    Informasi tempat duduk mengikuti
-                    ketentuan penyelenggara.
+                  <small className="mt-1 block text-[11px] leading-[1.6] text-[#aaa1bd]">
+                    Informasi tempat duduk mengikuti ketentuan penyelenggara.
                   </small>
                 </p>
               </div>
-              <div>
-                <span>⌛</span>
-                <p>
+              <div className="flex items-start gap-[13px]">
+                <span className="w-[23px] shrink-0 text-lg text-primary-light">
+                  ⌛
+                </span>
+                <p className="text-[13px] leading-[1.6] text-[#eee9f8]">
                   Valid on <strong>{concert.date}</strong>
                 </p>
               </div>
             </div>
 
-            <div className="summary-payment">
-              <details>
-                <summary>
-                  <span>Total Payment</span>
-                  <strong>{formatPrice(total)}</strong>
-                  <span className="summary-arrow">⌄</span>
+            <div className="mx-[-27px] mt-5 rounded-b-[15px] border-t-8 border-[#241b35] bg-[#100b20] px-[27px] py-[18px] max-[800px]:mx-[-21px] max-[800px]:px-[21px]">
+              <details className="group">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2.5 [&::-webkit-details-marker]:hidden">
+                  <span className="text-xs text-[#c5bad8]">Total Payment</span>
+                  <strong className="text-right text-[17px] text-[#c4b5fd]">
+                    {formatPrice(total)}
+                  </strong>
+                  <span className="text-[21px] text-[#c4b5fd] transition-transform duration-200 group-open:rotate-180">
+                    ⌄
+                  </span>
                 </summary>
 
-                <div className="summary-payment-detail">
-                  <div>
-                    <span>Harga Tiket</span>
-                    <strong>
+                <div className="flex flex-col gap-[13px] pt-5">
+                  <div className="flex justify-between gap-2.5 text-xs">
+                    <span className="text-[#aaa1bd]">Harga Tiket</span>
+                    <strong className="text-white">
                       {formatPrice(selectedTicket.price)}
                     </strong>
                   </div>
-                  <div>
-                    <span>Jumlah</span>
-                    <strong>{quantity}</strong>
+                  <div className="flex justify-between gap-2.5 text-xs">
+                    <span className="text-[#aaa1bd]">Jumlah</span>
+                    <strong className="text-white">{quantity}</strong>
                   </div>
-                  <div>
-                    <span>Subtotal</span>
-                    <strong>{formatPrice(subtotal)}</strong>
+                  <div className="flex justify-between gap-2.5 text-xs">
+                    <span className="text-[#aaa1bd]">Subtotal</span>
+                    <strong className="text-white">
+                      {formatPrice(subtotal)}
+                    </strong>
                   </div>
-                  <div>
-                    <span>Biaya Layanan</span>
-                    <strong>{formatPrice(serviceFee)}</strong>
+                  <div className="flex justify-between gap-2.5 text-xs">
+                    <span className="text-[#aaa1bd]">Biaya Layanan</span>
+                    <strong className="text-white">
+                      {formatPrice(serviceFee)}
+                    </strong>
                   </div>
-                  <div className="summary-final-total">
-                    <span>Total</span>
-                    <strong>{formatPrice(total)}</strong>
+                  <div className="flex justify-between gap-2.5 border-t border-[#493d61] pt-[13px] text-xs">
+                    <span className="text-[#aaa1bd]">Total</span>
+                    <strong className="text-[#c4b5fd]">
+                      {formatPrice(total)}
+                    </strong>
                   </div>
                 </div>
               </details>
             </div>
 
-            <button type="submit" className="checkout-submit">
+            <button
+              type="submit"
+              className="mt-5 min-h-[50px] w-full cursor-pointer rounded-[10px] border-0 bg-[linear-gradient(100deg,#7c3aed,#a855f7)] text-[13px] font-bold text-white transition duration-200 hover:-translate-y-0.5 hover:brightness-110"
+            >
               Lanjutkan ke Pembayaran →
             </button>
 
-            <p className="checkout-secure">
-              🔒 Transaksi simulasi ENCORE
+            <p className="mt-3.5 text-center text-[11px] text-[#9990aa]">
+              🔒 Transaksi resmi ENCORE
             </p>
           </aside>
         </form>
       </div>
-
-      <style jsx>{`
-        .encore-checkout {
-          min-height: 100vh;
-          padding: 45px 6%;
-          color: #fff;
-          background:
-            linear-gradient(180deg, rgba(9,7,20,.82), rgba(9,7,20,.97)),
-            url("/images/bg%20konser.jpg") center top / cover fixed;
-        }
-
-        .checkout-container {
-          max-width: 1180px;
-          margin: 0 auto;
-        }
-
-        .checkout-back {
-          color: #c4b5fd;
-          font-size: 13px;
-          text-decoration: none;
-        }
-
-        .checkout-heading {
-          margin: 28px 0;
-        }
-
-        .checkout-heading > span {
-          color: #a78bfa;
-          font-size: 11px;
-          font-weight: 800;
-          letter-spacing: 2px;
-        }
-
-        .checkout-heading h1 {
-          margin: 9px 0;
-          font-size: clamp(28px, 4vw, 38px);
-        }
-
-        .checkout-heading p,
-        .checkout-section-title p {
-          color: #aaa1bd;
-          font-size: 14px;
-          line-height: 1.7;
-        }
-
-        .checkout-layout {
-          display: grid;
-          grid-template-columns: minmax(0, 1.55fr) minmax(320px, .85fr);
-          align-items: start;
-          gap: 24px;
-        }
-
-        .checkout-form-card,
-        .checkout-summary {
-          padding: 27px;
-          border: 1px solid #49316d;
-          border-radius: 17px;
-          background: rgba(17,12,32,.96);
-          box-shadow: 0 12px 35px #00000035;
-        }
-
-        .checkout-section-title {
-          margin-bottom: 24px;
-        }
-
-        .checkout-section-title > div {
-          display: flex;
-          align-items: center;
-          gap: 13px;
-        }
-
-        .checkout-section-title > div span {
-          display: grid;
-          place-items: center;
-          width: 35px;
-          height: 35px;
-          border-radius: 9px;
-          background: #8b5cf625;
-          color: #c4b5fd;
-          font-weight: 800;
-        }
-
-        .checkout-section-title h2 {
-          font-size: 20px;
-        }
-
-        .checkout-section-title p {
-          margin: 9px 0 0 48px;
-          font-size: 12px;
-        }
-
-        .same-account {
-          display: flex;
-          align-items: center;
-          gap: 11px;
-          margin-bottom: 19px;
-          cursor: pointer;
-          color: #e8e0f5;
-          font-size: 13px;
-        }
-
-        .same-account input {
-          position: absolute;
-          opacity: 0;
-          pointer-events: none;
-        }
-
-        .custom-check {
-          display: grid;
-          place-items: center;
-          width: 22px;
-          height: 22px;
-          border: 1px solid #625278;
-          border-radius: 50%;
-          color: transparent;
-          font-size: 12px;
-        }
-
-        .same-account input:checked + .custom-check {
-          border-color: #a78bfa;
-          background: #8b5cf6;
-          color: white;
-        }
-
-        .checkout-info {
-          display: flex;
-          gap: 10px;
-          padding: 13px 15px;
-          border-radius: 9px;
-          background: #8b5cf619;
-          color: #c8b8e4;
-          font-size: 11px;
-          line-height: 1.6;
-        }
-
-        .checkout-info span {
-          color: #a78bfa;
-        }
-
-        .checkout-fields {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-          margin-top: 25px;
-        }
-
-        .checkout-field {
-          display: flex;
-          flex-direction: column;
-          gap: 9px;
-        }
-
-        .checkout-field label {
-          color: #eee9f8;
-          font-size: 13px;
-          font-weight: 650;
-        }
-
-        .checkout-field input {
-          width: 100%;
-          height: 54px;
-          padding: 0 17px;
-          border: 1px solid #493d61;
-          border-radius: 10px;
-          outline: none;
-          background: #0c0918;
-          color: white;
-          font: inherit;
-          font-size: 13px;
-        }
-
-        .checkout-field input:focus {
-          border-color: #a78bfa;
-          box-shadow: 0 0 0 3px #8b5cf620;
-        }
-
-        .checkout-field input::placeholder {
-          color: #827990;
-        }
-
-        .checkout-field small {
-          color: #9990aa;
-          font-size: 11px;
-        }
-
-        .phone-input {
-          display: flex;
-          align-items: center;
-          overflow: hidden;
-          border: 1px solid #493d61;
-          border-radius: 10px;
-          background: #0c0918;
-        }
-
-        .phone-code {
-          padding: 0 14px;
-          color: #d8c4ff;
-          font-size: 13px;
-          white-space: nowrap;
-          border-right: 1px solid #493d61;
-        }
-
-        .phone-input input {
-          border: none;
-          border-radius: 0;
-          background: transparent;
-        }
-
-        .phone-input:focus-within {
-          border-color: #a78bfa;
-        }
-
-        .summary-event {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-        }
-
-        .summary-event img {
-          width: 65px;
-          height: 75px;
-          flex-shrink: 0;
-          border-radius: 9px;
-          object-fit: cover;
-        }
-
-        .summary-event-info {
-          display: flex;
-          flex: 1;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 10px;
-        }
-
-        .summary-event-info h3 {
-          font-size: 14px;
-          line-height: 1.5;
-        }
-
-        .summary-event-info button {
-          flex-shrink: 0;
-          border: none;
-          background: transparent;
-          color: #a78bfa;
-          font-size: 12px;
-          font-weight: 700;
-          cursor: pointer;
-        }
-
-        .summary-divider {
-          height: 1px;
-          margin: 20px 0;
-          background: #392e4d;
-        }
-
-        .summary-category strong {
-          color: #f5f1fc;
-          font-size: 14px;
-        }
-
-        .summary-ticket-count {
-          display: flex;
-          align-items: center;
-          gap: 9px;
-          margin-top: 15px;
-          color: #f5f1fc;
-          font-size: 13px;
-        }
-
-        .summary-ticket-count span {
-          color: #827990;
-        }
-
-        .summary-date {
-          display: flex;
-          flex-direction: column;
-          gap: 7px;
-        }
-
-        .summary-date span {
-          color: #aaa1bd;
-          font-size: 12px;
-        }
-
-        .summary-date strong {
-          color: #f5f1fc;
-          font-size: 14px;
-        }
-
-        .summary-benefits {
-          display: flex;
-          flex-direction: column;
-          gap: 19px;
-          margin: 22px 0;
-        }
-
-        .summary-benefits > div {
-          display: flex;
-          align-items: flex-start;
-          gap: 13px;
-        }
-
-        .summary-benefits > div > span {
-          width: 23px;
-          flex-shrink: 0;
-          color: #a78bfa;
-          font-size: 18px;
-        }
-
-        .summary-benefits p {
-          color: #eee9f8;
-          font-size: 13px;
-          line-height: 1.6;
-        }
-
-        .summary-benefits small {
-          display: block;
-          margin-top: 4px;
-          color: #aaa1bd;
-          font-size: 11px;
-          line-height: 1.6;
-        }
-
-        .summary-payment {
-          margin: 20px -27px 0;
-          padding: 18px 27px;
-          border-top: 8px solid #241b35;
-          border-radius: 0 0 15px 15px;
-          background: #100b20;
-        }
-
-        .summary-payment details summary {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-          cursor: pointer;
-          list-style: none;
-        }
-
-        .summary-payment details summary::-webkit-details-marker {
-          display: none;
-        }
-
-        .summary-payment summary > span:first-child {
-          color: #c5bad8;
-          font-size: 12px;
-        }
-
-        .summary-payment summary > strong {
-          color: #c4b5fd;
-          font-size: 17px;
-          text-align: right;
-        }
-
-        .summary-arrow {
-          color: #c4b5fd;
-          font-size: 21px;
-          transition: transform .2s;
-        }
-
-        .summary-payment details[open] .summary-arrow {
-          transform: rotate(180deg);
-        }
-
-        .summary-payment-detail {
-          display: flex;
-          flex-direction: column;
-          gap: 13px;
-          padding-top: 20px;
-        }
-
-        .summary-payment-detail > div {
-          display: flex;
-          justify-content: space-between;
-          gap: 10px;
-          font-size: 12px;
-        }
-
-        .summary-payment-detail span {
-          color: #aaa1bd;
-        }
-
-        .summary-payment-detail strong {
-          color: white;
-        }
-
-        .summary-final-total {
-          padding-top: 13px;
-          border-top: 1px solid #493d61;
-        }
-
-        .summary-final-total strong {
-          color: #c4b5fd;
-        }
-
-        .checkout-submit {
-          width: 100%;
-          min-height: 50px;
-          margin-top: 20px;
-          border: none;
-          border-radius: 10px;
-          background: linear-gradient(100deg, #7c3aed, #a855f7);
-          color: white;
-          font-size: 13px;
-          font-weight: 750;
-          cursor: pointer;
-          transition: .2s;
-        }
-
-        .checkout-submit:hover {
-          filter: brightness(1.12);
-          transform: translateY(-2px);
-        }
-
-        .checkout-secure {
-          margin-top: 14px;
-          color: #9990aa;
-          font-size: 11px;
-          text-align: center;
-        }
-
-        .checkout-error {
-          margin-top: 18px;
-          color: #fca5a5;
-          font-size: 12px;
-        }
-
-        .checkout-loading {
-          padding: 100px 0;
-          color: #c4b5fd;
-          text-align: center;
-        }
-
-        .checkout-empty {
-          max-width: 500px;
-          margin: 100px auto;
-          padding: 30px;
-          border: 1px solid #49316d;
-          border-radius: 15px;
-          background: #110c20;
-          text-align: center;
-        }
-
-        .checkout-empty p {
-          margin: 15px 0;
-          color: #aaa1bd;
-        }
-
-        .checkout-empty a {
-          color: #c4b5fd;
-        }
-
-        @media (max-width: 800px) {
-          .encore-checkout {
-            padding: 30px 5%;
-            background-attachment: scroll;
-          }
-
-          .checkout-layout {
-            grid-template-columns: 1fr;
-          }
-
-          .checkout-form-card,
-          .checkout-summary {
-            padding: 21px;
-          }
-
-          .summary-payment {
-            margin-right: -21px;
-            margin-left: -21px;
-            padding-right: 21px;
-            padding-left: 21px;
-          }
-        }
-      `}</style>
     </main>
   );
 }
@@ -887,8 +554,8 @@ export default function CheckoutPage() {
   return (
     <Suspense
       fallback={
-        <main className="encore-checkout">
-          <p className="checkout-loading">
+        <main className={pageWrapperClass}>
+          <p className="py-[100px] text-center text-[#c4b5fd]">
             Memuat checkout...
           </p>
         </main>

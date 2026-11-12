@@ -1,61 +1,98 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { concerts } from "../../../data/concerts";
+import { useRouter } from "next/navigation";
+import { supabase } from "../../../lib/supabase";
+
+const thClass =
+  "border-b border-[#39274b] p-[15px] text-left text-[13px] font-bold text-[#bd83ff]";
+const tdClass =
+  "border-b border-[#39274b] p-[15px] text-left text-[13px] text-[#eee5fa]";
 
 export default function AdminDashboard() {
+  const router = useRouter();
+
   const [users, setUsers] = useState([]);
+  const [eventsCount, setEventsCount] = useState(0);
   const [orders, setOrders] = useState([]);
   const [adminName, setAdminName] = useState("Admin");
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    try {
-      const currentUser = JSON.parse(
-        localStorage.getItem("encoreCurrentUser") || "null"
-      );
+    const loadAdminData = async () => {
+      try {
+        // 1. Cek sesi login dari Supabase Auth
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (!currentUser || currentUser.role !== "admin") {
-        window.location.href = "/login";
-        return;
+        if (!user) {
+          router.replace("/login");
+          return;
+        }
+
+        // 2. Pastikan role adalah admin di tabel 'profiles'
+        const { data: adminProfile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        if (!adminProfile || adminProfile.role !== "admin") {
+          router.replace("/login");
+          return;
+        }
+
+        setAdminName(adminProfile.name || "Admin");
+
+        // 3. Ambil seluruh data pengguna, event, dan order secara paralel
+        const [profilesRes, eventsRes, ordersRes] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("*")
+            .order("created_at", { ascending: false }),
+          supabase.from("events").select("id", { count: "exact", head: true }),
+          supabase.from("orders").select("*"),
+        ]);
+
+        if (profilesRes.data) setUsers(profilesRes.data);
+        if (typeof eventsRes.count === "number") setEventsCount(eventsRes.count);
+        if (ordersRes.data) {
+          setOrders(
+            ordersRes.data.filter(
+              (o) => (o.payment_status || o.payment_ststus) === "paid"
+            )
+          );
+        }
+      } catch (error) {
+        console.error("Gagal membaca data admin:", error);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      setAdminName(currentUser.name || "Admin");
+    loadAdminData();
+  }, [router]);
 
-      const savedUsers = JSON.parse(
-        localStorage.getItem("encoreUsers") || "[]"
-      );
+  const updateOrganizer = async (userId, newStatus) => {
+    setMessage("");
 
-      const savedOrders = JSON.parse(
-        localStorage.getItem("encoreOrders") || "[]"
-      );
+    const { error } = await supabase
+      .from("profiles")
+      .update({ status: newStatus })
+      .eq("id", userId);
 
-      setUsers(Array.isArray(savedUsers) ? savedUsers : []);
-      setOrders(
-        Array.isArray(savedOrders)
-          ? savedOrders.filter((order) => order.status === "paid")
-          : []
-      );
-    } catch (error) {
-      console.error("Gagal membaca data admin:", error);
+    if (error) {
+      alert("Gagal memperbarui status: " + error.message);
+      return;
     }
-  }, []);
 
-  const updateOrganizer = (userId, newStatus) => {
-    const updatedUsers = users.map((user) =>
-      user.id === userId
-        ? { ...user, status: newStatus }
-        : user
+    setUsers((prev) =>
+      prev.map((user) =>
+        user.id === userId ? { ...user, status: newStatus } : user
+      )
     );
-
-    localStorage.setItem(
-      "encoreUsers",
-      JSON.stringify(updatedUsers)
-    );
-
-    setUsers(updatedUsers);
 
     setMessage(
       newStatus === "active"
@@ -69,15 +106,8 @@ export default function AdminDashboard() {
     0
   );
 
-  const totalTickets = orders.reduce(
-    (total, order) =>
-      total + Number(order.ticketQuantity || 0),
-    0
-  );
-
   const pendingOrganizers = users.filter(
-    (user) =>
-      user.role === "organizer" && user.status === "pending"
+    (user) => user.role === "organizer" && user.status === "pending"
   );
 
   const formatPrice = (price) =>
@@ -87,116 +117,142 @@ export default function AdminDashboard() {
       maximumFractionDigits: 0,
     }).format(price);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     localStorage.removeItem("encoreCurrentUser");
-    window.location.href = "/login";
+    router.push("/login");
   };
 
+  if (loading) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#10091b] text-white">
+        Memuat dashboard admin...
+      </main>
+    );
+  }
+
   return (
-    <main className="admin-page">
-      <header className="admin-header">
+    <main className="box-border min-h-screen bg-[#10091b] p-10 text-white max-[750px]:p-[22px]">
+      <header className="mb-[35px] flex items-center justify-between gap-5 max-[750px]:items-start">
         <div>
-          <span className="eyebrow">ENCORE ADMINISTRATION</span>
-          <h1>Admin Dashboard</h1>
-          <p>Selamat datang, {adminName}!</p>
+          <span className="text-xs font-bold tracking-[2px] text-[#bd83ff]">
+            ENCORE ADMINISTRATION
+          </span>
+          <h1 className="my-3 font-heading text-[32px] font-bold">
+            Admin Dashboard
+          </h1>
+          <p className="text-[#b9a9d0]">Selamat datang, {adminName}!</p>
         </div>
 
-        <button className="logout-button" onClick={handleLogout}>
+        <button
+          type="button"
+          className="cursor-pointer rounded-[9px] border border-[#7544a6] bg-[#38203f] px-[22px] py-3 text-white transition hover:bg-[#492a52]"
+          onClick={handleLogout}
+        >
           Keluar
         </button>
       </header>
 
-      <section className="admin-stats">
-        <div className="stat-card">
-          <span>Total Pengguna</span>
-          <strong>{users.length}</strong>
+      <section className="mb-[30px] grid grid-cols-4 gap-[18px] max-[750px]:grid-cols-2 max-[480px]:grid-cols-1">
+        <div className="rounded-[15px] border border-[#39274b] bg-[#1c1229] p-6">
+          <span className="block text-[13px] text-[#b9a9d0]">
+            Total Pengguna
+          </span>
+          <strong className="mt-3.5 block text-[26px] text-[#c58aff]">
+            {users.length}
+          </strong>
         </div>
 
-        <div className="stat-card">
-          <span>Total Event</span>
-          <strong>{concerts.length}</strong>
+        <div className="rounded-[15px] border border-[#39274b] bg-[#1c1229] p-6">
+          <span className="block text-[13px] text-[#b9a9d0]">Total Event</span>
+          <strong className="mt-3.5 block text-[26px] text-[#c58aff]">
+            {eventsCount}
+          </strong>
         </div>
 
-        <div className="stat-card">
-          <span>Total Transaksi</span>
-          <strong>{orders.length}</strong>
+        <div className="rounded-[15px] border border-[#39274b] bg-[#1c1229] p-6">
+          <span className="block text-[13px] text-[#b9a9d0]">
+            Total Transaksi
+          </span>
+          <strong className="mt-3.5 block text-[26px] text-[#c58aff]">
+            {orders.length}
+          </strong>
         </div>
 
-        <div className="stat-card">
-          <span>Total Tiket Terjual</span>
-          <strong>{totalTickets}</strong>
-        </div>
-
-        <div className="stat-card revenue-card">
-          <span>Total Pendapatan</span>
-          <strong>{formatPrice(totalRevenue)}</strong>
+        <div className="rounded-[15px] border border-[#39274b] bg-[#1c1229] p-6">
+          <span className="block text-[13px] text-[#b9a9d0]">
+            Total Pendapatan
+          </span>
+          <strong className="mt-3.5 block text-[26px] text-[#c58aff]">
+            {formatPrice(totalRevenue)}
+          </strong>
         </div>
       </section>
 
-      <section className="admin-content">
-        <div className="section-title">
+      <section className="mb-[25px] rounded-[15px] border border-[#39274b] bg-[#1c1229] p-6">
+        <div className="mb-5 flex items-center justify-between gap-[15px]">
           <div>
-            <h2>Persetujuan Organizer</h2>
-            <p>
+            <h2 className="mt-0 font-heading text-xl font-bold">
+              Persetujuan Organizer
+            </h2>
+            <p className="mt-1 text-[13px] text-[#b9a9d0]">
               Periksa dan kelola pendaftaran penyelenggara konser.
             </p>
           </div>
 
-          <span className="pending-count">
+          <span className="rounded-[20px] bg-[#49351d] px-[13px] py-2 text-xs whitespace-nowrap text-[#ffc76a]">
             {pendingOrganizers.length} Menunggu
           </span>
         </div>
 
         {message && (
-          <div className="success-message">
+          <div className="mb-[18px] rounded-lg bg-[#183d30] p-[13px] text-sm text-[#65e5a4]">
             {message}
           </div>
         )}
 
         {pendingOrganizers.length === 0 ? (
-          <div className="empty">
+          <div className="rounded-[10px] bg-[#160e21] p-[30px] text-center text-sm text-[#b9a9d0]">
             Tidak ada pendaftaran Organizer yang menunggu persetujuan.
           </div>
         ) : (
-          <div className="table-wrapper">
-            <table>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[650px] border-collapse">
               <thead>
                 <tr>
-                  <th>Nama</th>
-                  <th>Organisasi</th>
-                  <th>Email</th>
-                  <th>Tanggal Daftar</th>
-                  <th>Aksi</th>
+                  <th className={thClass}>Nama</th>
+                  <th className={thClass}>Organisasi</th>
+                  <th className={thClass}>Email</th>
+                  <th className={thClass}>Tanggal Daftar</th>
+                  <th className={thClass}>Aksi</th>
                 </tr>
               </thead>
 
               <tbody>
-                {pendingOrganizers.map((user, index) => (
-                  <tr key={`${user.id}-${index}`}>
-                    <td>{user.name}</td>
-                    <td>{user.organization || "-"}</td>
-                    <td>{user.email}</td>
-                    <td>
-                      {user.createdAt
-                        ? new Date(user.createdAt).toLocaleDateString("id-ID")
+                {pendingOrganizers.map((user) => (
+                  <tr key={user.id}>
+                    <td className={tdClass}>{user.name}</td>
+                    <td className={tdClass}>{user.organization || "-"}</td>
+                    <td className={tdClass}>{user.email}</td>
+                    <td className={tdClass}>
+                      {user.created_at
+                        ? new Date(user.created_at).toLocaleDateString("id-ID")
                         : "-"}
                     </td>
-                    <td>
-                      <div className="action-buttons">
+                    <td className={tdClass}>
+                      <div className="flex gap-2">
                         <button
-                          className="approve-button"
-                          onClick={() =>
-                            updateOrganizer(user.id, "active")
-                          }
+                          type="button"
+                          className="cursor-pointer rounded-[7px] border-0 bg-[#18794e] px-3 py-2 text-[11px] font-medium text-white transition hover:brightness-110"
+                          onClick={() => updateOrganizer(user.id, "active")}
                         >
                           Setujui
                         </button>
 
                         <button
-                          className="reject-button"
-                          onClick={() =>
-                            updateOrganizer(user.id, "rejected")
-                          }
+                          type="button"
+                          className="cursor-pointer rounded-[7px] border-0 bg-[#923c4b] px-3 py-2 text-[11px] font-medium text-white transition hover:brightness-110"
+                          onClick={() => updateOrganizer(user.id, "rejected")}
                         >
                           Tolak
                         </button>
@@ -210,42 +266,46 @@ export default function AdminDashboard() {
         )}
       </section>
 
-      <section className="admin-content">
-        <h2>Daftar Pengguna</h2>
-        <p>Pantau akun yang terdaftar di ENCORE.</p>
+      <section className="mb-[25px] rounded-[15px] border border-[#39274b] bg-[#1c1229] p-6">
+        <h2 className="mt-0 font-heading text-xl font-bold">
+          Daftar Pengguna
+        </h2>
+        <p className="mt-1 mb-4 text-[13px] text-[#b9a9d0]">
+          Pantau akun yang terdaftar di ENCORE.
+        </p>
 
-        <div className="table-wrapper">
-          <table>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[650px] border-collapse">
             <thead>
               <tr>
-                <th>Nama</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
+                <th className={thClass}>Nama</th>
+                <th className={thClass}>Email</th>
+                <th className={thClass}>Role</th>
+                <th className={thClass}>Status</th>
               </tr>
             </thead>
 
             <tbody>
-              {users.map((user, index) => (
-                <tr key={`${user.id}-${index}`}>
-                  <td>{user.name}</td>
-                  <td>{user.email}</td>
-                  <td>{user.role}</td>
-                  <td>
+              {users.map((user) => (
+                <tr key={user.id}>
+                  <td className={tdClass}>{user.name}</td>
+                  <td className={tdClass}>{user.email}</td>
+                  <td className={tdClass}>{user.role}</td>
+                  <td className={tdClass}>
                     <span
-                      className={
+                      className={`inline-block rounded-[20px] px-2.5 py-1.5 text-[11px] ${
                         user.status === "active"
-                          ? "active-status"
+                          ? "bg-[#183d30] text-[#65e5a4]"
                           : user.status === "pending"
-                          ? "pending-status"
-                          : "rejected-status"
-                      }
+                            ? "bg-[#49351d] text-[#ffc76a]"
+                            : "bg-[#48232b] text-[#ff9a9a]"
+                      }`}
                     >
                       {user.status === "active"
                         ? "Aktif"
                         : user.status === "pending"
-                        ? "Menunggu"
-                        : "Ditolak"}
+                          ? "Menunggu"
+                          : "Ditolak"}
                     </span>
                   </td>
                 </tr>
@@ -253,240 +313,15 @@ export default function AdminDashboard() {
 
               {users.length === 0 && (
                 <tr>
-                  <td colSpan="4">Belum ada pengguna terdaftar.</td>
+                  <td colSpan="4" className={tdClass}>
+                    Belum ada pengguna terdaftar.
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
       </section>
-
-      <style>{`
-        * {
-          box-sizing: border-box;
-        }
-
-        .admin-page {
-          min-height: 100vh;
-          padding: 40px;
-          background: #10091b;
-          color: white;
-          font-family: Arial, sans-serif;
-        }
-
-        .admin-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 20px;
-          margin-bottom: 35px;
-        }
-
-        .eyebrow {
-          color: #bd83ff;
-          font-size: 12px;
-          font-weight: bold;
-          letter-spacing: 2px;
-        }
-
-        .admin-header h1 {
-          font-size: 32px;
-          margin: 12px 0;
-        }
-
-        .admin-header p {
-          color: #b9a9d0;
-        }
-
-        .logout-button {
-          background: #38203f;
-          border: 1px solid #7544a6;
-          color: white;
-          padding: 12px 22px;
-          border-radius: 9px;
-          cursor: pointer;
-        }
-
-        .admin-stats {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 18px;
-          margin-bottom: 30px;
-        }
-
-        .stat-card,
-        .admin-content {
-          background: #1c1229;
-          border: 1px solid #39274b;
-          border-radius: 15px;
-          padding: 24px;
-        }
-
-        .stat-card span {
-          display: block;
-          color: #b9a9d0;
-          font-size: 13px;
-        }
-
-        .stat-card strong {
-          display: block;
-          margin-top: 14px;
-          color: #c58aff;
-          font-size: 26px;
-        }
-
-        .revenue-card {
-          grid-column: span 2;
-        }
-
-        .admin-content {
-          margin-bottom: 25px;
-        }
-
-        .admin-content h2 {
-          margin-top: 0;
-        }
-
-        .admin-content > p,
-        .section-title p {
-          color: #b9a9d0;
-          font-size: 13px;
-        }
-
-        .section-title {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 15px;
-          margin-bottom: 20px;
-        }
-
-        .pending-count {
-          padding: 8px 13px;
-          background: #49351d;
-          color: #ffc76a;
-          border-radius: 20px;
-          font-size: 12px;
-          white-space: nowrap;
-        }
-
-        .table-wrapper {
-          overflow-x: auto;
-        }
-
-        table {
-          width: 100%;
-          min-width: 650px;
-          border-collapse: collapse;
-        }
-
-        th,
-        td {
-          padding: 15px;
-          text-align: left;
-          border-bottom: 1px solid #39274b;
-          font-size: 13px;
-        }
-
-        th {
-          color: #bd83ff;
-        }
-
-        td {
-          color: #eee5fa;
-        }
-
-        .action-buttons {
-          display: flex;
-          gap: 8px;
-        }
-
-        .approve-button,
-        .reject-button {
-          padding: 8px 12px;
-          border: none;
-          border-radius: 7px;
-          color: white;
-          font-size: 11px;
-          cursor: pointer;
-        }
-
-        .approve-button {
-          background: #18794e;
-        }
-
-        .reject-button {
-          background: #923c4b;
-        }
-
-        .active-status,
-        .pending-status,
-        .rejected-status {
-          display: inline-block;
-          padding: 6px 10px;
-          border-radius: 20px;
-          font-size: 11px;
-        }
-
-        .active-status {
-          color: #65e5a4;
-          background: #183d30;
-        }
-
-        .pending-status {
-          color: #ffc76a;
-          background: #49351d;
-        }
-
-        .rejected-status {
-          color: #ff9a9a;
-          background: #48232b;
-        }
-
-        .empty {
-          padding: 30px;
-          text-align: center;
-          color: #b9a9d0;
-          background: #160e21;
-          border-radius: 10px;
-        }
-
-        .success-message {
-          padding: 13px;
-          margin-bottom: 18px;
-          border-radius: 8px;
-          background: #183d30;
-          color: #65e5a4;
-        }
-
-        @media (max-width: 750px) {
-          .admin-page {
-            padding: 22px;
-          }
-
-          .admin-stats {
-            grid-template-columns: repeat(2, 1fr);
-          }
-
-          .revenue-card {
-            grid-column: span 2;
-          }
-
-          .admin-header {
-            align-items: flex-start;
-          }
-        }
-
-        @media (max-width: 480px) {
-          .admin-stats {
-            grid-template-columns: 1fr;
-          }
-
-          .revenue-card {
-            grid-column: span 1;
-          }
-        }
-      `}</style>
     </main>
   );
 }

@@ -1,23 +1,25 @@
 "use client";
- 
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { concerts, formatPrice } from "../../data/concerts";
- 
+import { supabase } from "../../lib/supabase";
+
 const tag =
   "rounded-[5px] border border-[rgba(167,139,250,0.18)] bg-[rgba(139,92,246,0.1)] px-[9px] py-1.5 text-[10px] text-[#c4b5fd]";
- 
+
 export default function ConcertPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("Semua");
   const [genre, setGenre] = useState("Semua Genre");
   const [today, setToday] = useState(null);
   const [allConcerts, setAllConcerts] = useState(concerts);
- 
+  const [loadingEvents, setLoadingEvents] = useState(true);
+
   // ======================================
   // 01. TANGGAL INDONESIA
   // ======================================
- 
+
   useEffect(() => {
     const parts = new Intl.DateTimeFormat("en-US", {
       timeZone: "Asia/Jakarta",
@@ -25,114 +27,165 @@ export default function ConcertPage() {
       month: "2-digit",
       day: "2-digit",
     }).formatToParts(new Date());
- 
+
     const values = Object.fromEntries(
       parts.map((part) => [part.type, part.value])
     );
- 
-    setToday(
-      `${values.year}-${values.month}-${values.day}`
-    );
+
+    setToday(`${values.year}-${values.month}-${values.day}`);
   }, []);
- 
+
   // ======================================
-  // 01B. AMBIL EVENT BUATAN ORGANIZER
+  // 01B. AMBIL EVENT ORGANIZER DARI SUPABASE
   // ======================================
- 
+
   useEffect(() => {
-    try {
-      const savedEvents = JSON.parse(
-        localStorage.getItem("encoreCustomConcerts") || "[]"
-      );
- 
-      setAllConcerts([
-        ...concerts,
-        ...savedEvents.filter(
-          (event) => !concerts.some((item) => item.id === event.id)
-        ),
-      ]);
-    } catch (error) {
-      console.error("Gagal membaca event Organizer:", error);
-      setAllConcerts(concerts);
-    }
+    const fetchSupabaseEvents = async () => {
+      try {
+        const { data: eventsData, error } = await supabase
+          .from("events")
+          .select(
+            `
+            *,
+            ticket_types (
+              price
+            )
+          `
+          )
+          .order("event_date", { ascending: true });
+
+        if (error) {
+          console.error("Gagal memuat event dari Supabase:", error);
+          setAllConcerts(concerts);
+          return;
+        }
+
+        const mappedEvents = (eventsData || []).map((ev) => {
+          const ticketList = Array.isArray(ev.ticket_types)
+            ? ev.ticket_types
+            : [];
+          const minPrice =
+            ticketList.length > 0
+              ? Math.min(...ticketList.map((t) => Number(t.price || 0)))
+              : 0;
+
+          const parsedDate = ev.event_date ? new Date(ev.event_date) : null;
+          const isValidDate =
+            parsedDate && !Number.isNaN(parsedDate.getTime());
+
+          const dateISO = isValidDate
+            ? parsedDate.toISOString().slice(0, 10)
+            : "";
+
+          const formattedDate = isValidDate
+            ? parsedDate.toLocaleDateString("id-ID", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })
+            : ev.event_date || "-";
+
+          return {
+            id: ev.id,
+            title: ev.title,
+            artist: ev.artist || "ENCORE Artist",
+            date: formattedDate,
+            dateISO,
+            location: ev.location || ev.venue || "Indonesia",
+            venue: ev.venue || "",
+            category: ev.subtitle || "Konser",
+            genre: ev.subtitle || "Konser",
+            price: minPrice,
+            image: ev.image_url || "/images/default-concert.jpg",
+          };
+        });
+
+        setAllConcerts([
+          ...mappedEvents,
+          ...concerts.filter(
+            (item) => !mappedEvents.some((ev) => String(ev.id) === String(item.id))
+          ),
+        ]);
+      } catch (error) {
+        console.error("Gagal membaca event Organizer:", error);
+        setAllConcerts(concerts);
+      } finally {
+        setLoadingEvents(false);
+      }
+    };
+
+    fetchSupabaseEvents();
   }, []);
- 
+
   // ======================================
   // 02. STATUS KONSER
   // ======================================
- 
+
   const getStatus = (concert) => {
     if (!today || !concert.dateISO) {
       return "Memuat status";
     }
- 
+
     if (concert.dateISO > today) return "Mendatang";
     if (concert.dateISO === today) return "Berlangsung";
- 
+
     return "Selesai";
   };
- 
+
   // ======================================
   // 03. FILTER GENRE
   // ======================================
- 
+
   const genres = [
     "Semua Genre",
-    ...new Set(
-      allConcerts.map((concert) => concert.genre).filter(Boolean)
-    ),
+    ...new Set(allConcerts.map((concert) => concert.genre).filter(Boolean)),
   ];
- 
+
   // ======================================
   // 04. FILTER KONSER
   // ======================================
- 
+
   const filteredConcerts = allConcerts.filter((concert) => {
     const keyword = search.toLowerCase().trim();
- 
+
     const matchSearch = [
       concert.title,
       concert.artist,
       concert.location,
-    ].some((value) =>
-      String(value ?? "").toLowerCase().includes(keyword)
-    );
- 
-    const matchStatus =
-      status === "Semua" ||
-      getStatus(concert) === status;
- 
-    const matchGenre =
-      genre === "Semua Genre" ||
-      concert.genre === genre;
- 
+      concert.venue,
+    ].some((value) => String(value ?? "").toLowerCase().includes(keyword));
+
+    const matchStatus = status === "Semua" || getStatus(concert) === status;
+
+    const matchGenre = genre === "Semua Genre" || concert.genre === genre;
+
     return matchSearch && matchStatus && matchGenre;
   });
- 
+
   // ======================================
   // 05. KELAS TAILWIND
   // ======================================
- 
+
   const tabBase =
     "min-h-12 cursor-pointer rounded-[11px] border px-[25px] text-[13px] font-semibold transition duration-[250ms] max-[640px]:min-h-10 max-[640px]:px-[15px] max-[640px]:text-[11px]";
   const tabIdle =
     "border-[rgba(167,139,250,0.2)] bg-[rgba(20,15,38,0.88)] text-[#c8bfdc] hover:border-[#8b5cf6] hover:text-white";
   const tabActive = "border-[#8b5cf6] bg-[#8b5cf6] text-white";
- 
+
   // ======================================
   // 06. TAMPILAN HALAMAN
   // ======================================
- 
+
   return (
     <main className="relative isolate min-h-screen w-full overflow-hidden bg-[#090714] text-white">
       {/* BACKGROUND */}
- 
+
       <div className="pointer-events-none absolute inset-0 z-[-2] bg-[url('/images/bg%20concerts.jpg')] bg-cover bg-[position:center_top] bg-no-repeat" />
       <div className="pointer-events-none absolute inset-0 z-[-1] bg-[linear-gradient(180deg,rgba(9,7,20,0.68)_0%,rgba(9,7,20,0.82)_45%,rgba(9,7,20,0.96)_100%)]" />
- 
+
       <section className="relative z-[2] m-0 w-full bg-transparent px-[7%] pt-7 pb-[65px] max-[1024px]:px-[5%] max-[640px]:pt-5 max-[640px]:pb-[45px]">
         {/* SEARCH + GENRE */}
- 
+
         <div className="mb-[22px] flex w-full items-center gap-3.5 max-[640px]:mb-4 max-[640px]:flex-col max-[640px]:items-stretch max-[640px]:gap-2.5">
           <div className="flex h-[52px] min-h-[52px] min-w-0 flex-1 items-center gap-3 rounded-[11px] border border-[rgba(196,181,253,0.24)] bg-[rgba(16,12,31,0.9)] px-[18px] backdrop-blur-[12px] transition-[border-color,background-color] duration-[250ms] focus-within:border-[#a78bfa] focus-within:bg-[rgba(20,15,38,0.96)] max-[640px]:w-full">
             <svg
@@ -149,7 +202,7 @@ export default function ConcertPage() {
               <circle cx="10.8" cy="10.8" r="6.8" />
               <path d="m16 16 4 4" />
             </svg>
- 
+
             <input
               type="search"
               placeholder="Cari konser, artis, atau kota..."
@@ -158,7 +211,7 @@ export default function ConcertPage() {
               onChange={(e) => setSearch(e.target.value)}
               className="h-full w-full min-w-0 flex-1 border-none bg-transparent p-0 text-[13px] text-white outline-none placeholder:text-[#91889f] [&::-webkit-search-cancel-button]:hidden"
             />
- 
+
             {search && (
               <button
                 type="button"
@@ -170,7 +223,7 @@ export default function ConcertPage() {
               </button>
             )}
           </div>
- 
+
           <select
             value={genre}
             onChange={(e) => setGenre(e.target.value)}
@@ -184,9 +237,9 @@ export default function ConcertPage() {
             ))}
           </select>
         </div>
- 
+
         {/* STATUS FILTER */}
- 
+
         <div className="mb-[30px] flex w-full flex-wrap items-center gap-3 max-[640px]:mb-[23px] max-[640px]:gap-2">
           {["Semua", "Mendatang", "Berlangsung", "Selesai"].map((item) => (
             <button
@@ -199,17 +252,17 @@ export default function ConcertPage() {
             </button>
           ))}
         </div>
- 
+
         {/* RESULT COUNT */}
- 
+
         <p className="mb-[27px] text-[13px] leading-[1.6] text-[#c1b8d5] max-[640px]:mb-5">
-          {today === null && status !== "Semua"
+          {loadingEvents || (today === null && status !== "Semua")
             ? "Memuat konser..."
             : `Menampilkan ${filteredConcerts.length} konser`}
         </p>
- 
+
         {/* CONCERT GRID */}
- 
+
         <div className="m-0 grid w-full grid-cols-4 gap-6 bg-transparent p-0 max-[1024px]:grid-cols-2 max-[1024px]:gap-5 max-[640px]:grid-cols-1 max-[640px]:gap-[18px]">
           {filteredConcerts.map((concert) => (
             <article
@@ -217,7 +270,7 @@ export default function ConcertPage() {
               className="group flex w-full min-w-0 flex-col overflow-hidden rounded-[13px] border border-[rgba(196,181,253,0.1)] bg-[rgba(13,10,27,0.94)] transition-[transform,border-color] duration-[250ms] hover:-translate-y-1 hover:border-[rgba(167,139,250,0.45)] hover:shadow-[0_10px_30px_#8b5cf615]"
             >
               {/* POSTER */}
- 
+
               <div className="relative h-[190px] w-full overflow-hidden bg-[#090714] max-[700px]:h-[230px]">
                 <img
                   src={concert.image || "/images/default-concert.jpg"}
@@ -225,50 +278,50 @@ export default function ConcertPage() {
                   loading="lazy"
                   className="block size-full object-cover object-center transition-transform duration-[400ms] group-hover:scale-[1.035]"
                 />
- 
+
                 <span className="absolute top-[13px] left-[13px] rounded-[7px] bg-[rgba(13,10,27,0.94)] px-3 py-[7px] text-[11px] font-semibold text-[#c4b5fd]">
                   {concert.category || "Konser"}
                 </span>
               </div>
- 
+
               {/* INFO */}
- 
+
               <div className="flex min-w-0 flex-1 flex-col p-[17px]">
                 <p className="mb-[9px] text-xs text-[#a78bfa]">
                   {concert.date}
                 </p>
- 
+
                 <h3 className="mb-[7px] text-base leading-[1.4] font-[750] text-white">
                   {concert.title}
                 </h3>
- 
+
                 <p className="mb-[9px] text-xs leading-[1.6] text-[#c3bbd2]">
                   {concert.artist}
                 </p>
- 
+
                 <p className="mb-[13px] text-xs text-[#a49bb5]">
                   ⌖ {concert.location}
                 </p>
- 
+
                 <div className="mt-3.5 mb-[17px] flex flex-wrap gap-[7px]">
                   {concert.genre && (
                     <span className={tag}>{concert.genre}</span>
                   )}
- 
+
                   <span className={tag}>{getStatus(concert)}</span>
                 </div>
- 
+
                 <div className="mt-auto flex items-end justify-between gap-2.5 border-t border-[rgba(196,181,253,0.12)] pt-[13px]">
                   <div className="flex min-w-0 flex-col gap-[5px]">
                     <span className="text-[10px] text-[#91889f]">
                       Mulai dari
                     </span>
- 
+
                     <strong className="text-[13px] leading-[1.4] font-bold text-white">
                       {formatPrice(concert.price)}
                     </strong>
                   </div>
- 
+
                   <Link
                     href={`/concerts/${concert.id}`}
                     aria-label={`Lihat detail ${concert.title}`}
@@ -281,10 +334,11 @@ export default function ConcertPage() {
             </article>
           ))}
         </div>
- 
+
         {/* EMPTY STATE */}
- 
+
         {filteredConcerts.length === 0 &&
+          !loadingEvents &&
           !(today === null && status !== "Semua") && (
             <p className="px-[15px] py-[50px] text-center text-sm text-[#b9a6e9]">
               Konser tidak ditemukan. Coba kata kunci atau filter lainnya.

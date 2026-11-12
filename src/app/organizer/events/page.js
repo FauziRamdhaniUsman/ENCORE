@@ -2,17 +2,24 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { concerts, formatPrice } from "../../../data/concerts";
+import { supabase } from "../../../lib/supabase";
 
 const inputClass =
   "w-full rounded-lg border border-[#49345f] bg-[#130c20] p-[13px] text-[13px] text-white placeholder:text-[#897a9d] focus:outline-1 focus:outline-[#a766e8]";
 
 export default function OrganizerEventsPage() {
-  const [orders, setOrders] = useState([]);
-  const [customEvents, setCustomEvents] = useState([]);
+  const router = useRouter();
+
   const [currentUser, setCurrentUser] = useState(null);
+  const [myEvents, setMyEvents] = useState([]);
+  const [paidTickets, setPaidTickets] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [isError, setIsError] = useState(false);
 
   const [form, setForm] = useState({
     title: "",
@@ -23,55 +30,131 @@ export default function OrganizerEventsPage() {
     category: "Konser",
     price: "",
     capacity: "",
+    image_url: "",
     description: "",
   });
 
-  useEffect(() => {
-    try {
-      const user = JSON.parse(
-        localStorage.getItem("encoreCurrentUser") || "null"
-      );
+  const fetchOrganizerEvents = async (userId) => {
+    // 1. Ambil daftar event milik organizer beserta jenis tiketnya
+    const { data: eventsData, error: eventsError } = await supabase
+      .from("events")
+      .select(
+        `
+        *,
+        ticket_types (
+          id,
+          name,
+          price,
+          quota
+        )
+      `
+      )
+      .eq("organizer_id", userId)
+      .order("created_at", { ascending: false });
 
-      setCurrentUser(user);
-
-      const savedOrders = JSON.parse(
-        localStorage.getItem("encoreOrders") || "[]"
-      );
-
-      const savedEvents = JSON.parse(
-        localStorage.getItem("encoreCustomConcerts") || "[]"
-      );
-
-      setOrders(
-        Array.isArray(savedOrders)
-          ? savedOrders.filter((order) => order.status === "paid")
-          : []
-      );
-
-      setCustomEvents(Array.isArray(savedEvents) ? savedEvents : []);
-    } catch (error) {
-      console.error("Gagal membaca data:", error);
+    if (eventsError) {
+      console.error("Gagal mengambil data event:", eventsError);
+      return;
     }
-  }, []);
 
-  const myEvents = customEvents.filter(
-    (event) => event.organizerId === currentUser?.id
-  );
+    const formattedEvents = (eventsData || []).map((ev) => {
+      const ticketsList = Array.isArray(ev.ticket_types) ? ev.ticket_types : [];
+      const minPrice =
+        ticketsList.length > 0
+          ? Math.min(...ticketsList.map((t) => Number(t.price || 0)))
+          : 0;
+      const totalQuota = ticketsList.reduce(
+        (sum, t) => sum + Number(t.quota || 0),
+        0
+      );
+
+      return {
+        ...ev,
+        minPrice,
+        totalQuota,
+      };
+    });
+
+    setMyEvents(formattedEvents);
+
+    // 2. Ambil tiket yang terjual (lunas) untuk menghitung statistik tiap event
+    if (formattedEvents.length > 0) {
+      const eventIds = formattedEvents.map((e) => e.id);
+      const { data: ticketsData } = await supabase
+        .from("tickets")
+        .select(
+          `
+          id,
+          event_id,
+          order_id,
+          orders (
+            id,
+            total,
+            payment_status
+          )
+        `
+        )
+        .in("event_id", eventIds);
+
+      const validTickets = (ticketsData || []).filter(
+        (t) => t.orders && t.orders.payment_status === "paid"
+      );
+      setPaidTickets(validTickets);
+    } else {
+      setPaidTickets([]);
+    }
+  };
+
+  useEffect(() => {
+    const initPage = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+          router.replace("/login");
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        if (!profile || profile.role !== "organizer") {
+          router.replace("/login");
+          return;
+        }
+
+        setCurrentUser(profile);
+        await fetchOrganizerEvents(user.id);
+      } catch (error) {
+        console.error("Gagal memuat halaman manajemen event:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initPage();
+  }, [router]);
 
   const updateForm = (e) => {
     const { name, value } = e.target;
-
     setForm((previous) => ({
       ...previous,
       [name]: value,
     }));
   };
 
-  const handleCreateEvent = (e) => {
+  const handleCreateEvent = async (e) => {
     e.preventDefault();
     setMessage("");
+    setIsError(false);
 
     if (!currentUser || currentUser.role !== "organizer") {
+      setIsError(true);
       setMessage("Hanya akun Organizer yang dapat membuat event.");
       return;
     }
@@ -85,91 +168,130 @@ export default function OrganizerEventsPage() {
       !form.price ||
       !form.capacity
     ) {
+      setIsError(true);
       setMessage("Mohon lengkapi semua kolom wajib.");
       return;
     }
 
     if (Number(form.price) <= 0 || Number(form.capacity) <= 0) {
+      setIsError(true);
       setMessage("Harga dan kapasitas harus lebih dari 0.");
       return;
     }
 
-    const newEvent = {
-      id: `custom-${Date.now()}`,
-      title: form.title.trim(),
-      artist: form.artist.trim(),
-      date: new Date(form.date + "T00:00:00").toLocaleDateString("id-ID", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }),
-      dateISO: form.date,
-      location: form.location.trim(),
-      venue: form.venue.trim(),
-      category: form.category,
-      price: Number(form.price),
-      capacity: Number(form.capacity),
-      description: form.description.trim(),
-      image: "",
-      organizer: currentUser.organization || currentUser.name,
-      organizerId: currentUser.id,
-      createdAt: new Date().toISOString(),
-      status: "active",
-    };
+    setSubmitting(true);
 
-    const updatedEvents = [...customEvents, newEvent];
+    try {
+      // 1. Simpan event baru ke tabel 'events'
+      const { data: createdEvent, error: eventError } = await supabase
+        .from("events")
+        .insert([
+          {
+            organizer_id: currentUser.id,
+            title: form.title.trim(),
+            artist: form.artist.trim(),
+            subtitle: form.category,
+            event_date: new Date(`${form.date}T00:00:00`).toISOString(),
+            location: form.location.trim(),
+            venue: form.venue.trim(),
+            description: form.description.trim() || null,
+            image_url: form.image_url.trim() || null,
+          },
+        ])
+        .select()
+        .single();
 
-    localStorage.setItem(
-      "encoreCustomConcerts",
-      JSON.stringify(updatedEvents)
-    );
+      if (eventError || !createdEvent) {
+        throw new Error(eventError?.message || "Gagal menyimpan event.");
+      }
 
-    setCustomEvents(updatedEvents);
+      // 2. Buat kategori tiket default di tabel 'ticket_types'
+      const { error: ticketError } = await supabase
+        .from("ticket_types")
+        .insert([
+          {
+            event_id: createdEvent.id,
+            name: "Regular / General Admission",
+            price: Number(form.price),
+            quota: Number(form.capacity),
+            description: `Tiket masuk resmi ${form.title.trim()}`,
+          },
+        ]);
 
-    setForm({
-      title: "",
-      artist: "",
-      date: "",
-      location: "",
-      venue: "",
-      category: "Konser",
-      price: "",
-      capacity: "",
-      description: "",
-    });
+      if (ticketError) {
+        throw new Error(
+          "Event tersimpan, namun gagal membuat tiket: " + ticketError.message
+        );
+      }
 
-    setShowForm(false);
-    setMessage("Event berhasil dibuat dan disimpan!");
+      await fetchOrganizerEvents(currentUser.id);
+
+      setForm({
+        title: "",
+        artist: "",
+        date: "",
+        location: "",
+        venue: "",
+        category: "Konser",
+        price: "",
+        capacity: "",
+        image_url: "",
+        description: "",
+      });
+
+      setShowForm(false);
+      setIsError(false);
+      setMessage("Event berhasil dibuat dan disimpan ke database!");
+    } catch (err) {
+      console.error("Create event error:", err);
+      setIsError(true);
+      setMessage(err.message || "Terjadi kesalahan saat menyimpan event.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const getEventStats = (event) => {
-    const eventOrders = orders.filter(
-      (order) => order.concertTitle === event.title
-    );
+  const getEventStats = (eventId) => {
+    const eventTickets = paidTickets.filter((t) => t.event_id === eventId);
+    const uniqueOrderIds = new Set();
+    let revenue = 0;
 
-    const ticketsSold = eventOrders.reduce(
-      (total, order) => total + Number(order.ticketQuantity || 0),
-      0
-    );
-
-    const revenue = eventOrders.reduce(
-      (total, order) => total + Number(order.total || 0),
-      0
-    );
+    eventTickets.forEach((t) => {
+      if (t.orders && !uniqueOrderIds.has(t.orders.id)) {
+        uniqueOrderIds.add(t.orders.id);
+        revenue += Number(t.orders.total || 0);
+      }
+    });
 
     return {
-      orders: eventOrders.length,
-      ticketsSold,
+      orders: uniqueOrderIds.size,
+      ticketsSold: eventTickets.length,
       revenue,
     };
   };
 
-  const totalTickets = orders.reduce(
-    (total, order) => total + Number(order.ticketQuantity || 0),
-    0
-  );
+  const formatDisplayDate = (dateStr) => {
+    if (!dateStr) return "-";
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  };
 
+  const totalUniqueOrders = new Set(paidTickets.map((t) => t.order_id)).size;
+  const totalTickets = paidTickets.length;
   const totalEvents = concerts.length + myEvents.length;
+
+  if (loading) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-[#10091b] text-white">
+        Memuat Manajemen Event...
+      </div>
+    );
+  }
 
   return (
     <main className="box-border min-h-screen bg-[#10091b] p-10 text-white max-[650px]:p-[22px]">
@@ -189,14 +311,14 @@ export default function OrganizerEventsPage() {
         <div className="flex flex-wrap gap-2.5">
           <Link
             href="/organizer/dashboard"
-            className="rounded-[9px] border border-[#49316d] bg-[#281b39] px-[18px] py-3 text-[13px] font-bold text-white"
+            className="rounded-[9px] border border-[#49316d] bg-[#281b39] px-[18px] py-3 text-[13px] font-bold text-white transition hover:border-[#a766e8]"
           >
             ← Dashboard
           </Link>
 
           <Link
             href="/organizer/checkin"
-            className="rounded-[9px] bg-[#a766e8] px-[18px] py-3 text-[13px] font-bold text-white"
+            className="rounded-[9px] bg-[#a766e8] px-[18px] py-3 text-[13px] font-bold text-white transition hover:brightness-110"
           >
             Scan Tiket →
           </Link>
@@ -225,7 +347,7 @@ export default function OrganizerEventsPage() {
             Total Transaksi
           </span>
           <strong className="mt-3 block text-[29px] text-[#c58aff]">
-            {orders.length}
+            {totalUniqueOrders}
           </strong>
         </div>
       </section>
@@ -243,7 +365,7 @@ export default function OrganizerEventsPage() {
 
           <button
             type="button"
-            className="cursor-pointer rounded-[9px] border-0 bg-[#a766e8] px-[19px] py-[13px] font-bold text-white"
+            className="cursor-pointer rounded-[9px] border-0 bg-[#a766e8] px-[19px] py-[13px] font-bold text-white transition hover:brightness-110"
             onClick={() => {
               setShowForm(!showForm);
               setMessage("");
@@ -254,7 +376,13 @@ export default function OrganizerEventsPage() {
         </div>
 
         {message && (
-          <div className="mt-5 rounded-[9px] bg-[#183d30] p-[13px] text-[13px] text-[#65e5a4]">
+          <div
+            className={`mt-5 rounded-[9px] p-[13px] text-[13px] ${
+              isError
+                ? "bg-[#48232b] text-[#ff9a9a]"
+                : "bg-[#183d30] text-[#65e5a4]"
+            }`}
+          >
             {message}
           </div>
         )}
@@ -387,6 +515,20 @@ export default function OrganizerEventsPage() {
 
             <div className="mb-[17px] flex flex-col gap-[9px]">
               <label className="text-[13px] font-bold text-[#d4aaff]">
+                URL Poster / Gambar Konser (Opsional)
+              </label>
+              <input
+                type="url"
+                name="image_url"
+                value={form.image_url}
+                onChange={updateForm}
+                placeholder="https://contoh.com/poster-konser.jpg"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="mb-[17px] flex flex-col gap-[9px]">
+              <label className="text-[13px] font-bold text-[#d4aaff]">
                 Deskripsi Event
               </label>
               <textarea
@@ -401,9 +543,10 @@ export default function OrganizerEventsPage() {
 
             <button
               type="submit"
-              className="mt-[5px] cursor-pointer rounded-[9px] border-0 bg-[#a766e8] px-[19px] py-[13px] font-bold text-white"
+              disabled={submitting}
+              className="mt-[5px] cursor-pointer rounded-[9px] border-0 bg-[#a766e8] px-[19px] py-[13px] font-bold text-white transition hover:brightness-110 disabled:opacity-60"
             >
-              Simpan Event
+              {submitting ? "Menyimpan..." : "Simpan Event"}
             </button>
           </form>
         )}
@@ -432,46 +575,65 @@ export default function OrganizerEventsPage() {
         ) : (
           <div className="grid grid-cols-2 gap-[22px] max-[850px]:grid-cols-1">
             {myEvents.map((event) => {
-              const stats = getEventStats(event);
+              const stats = getEventStats(event.id);
 
               return (
                 <article
                   className="overflow-hidden rounded-[15px] border border-[#39274b] bg-[#1c1229]"
                   key={event.id}
                 >
-                  <div className="flex min-h-[190px] flex-col justify-end gap-3 bg-[linear-gradient(135deg,#51316e,#1c1229)] p-[25px]">
-                    <span className="text-xs text-[#e3c8ff]">
-                      {event.category}
-                    </span>
-                    <strong className="text-[25px] [overflow-wrap:anywhere]">
-                      {event.title}
-                    </strong>
-                  </div>
+                  {event.image_url ? (
+                    <div className="relative h-[190px] bg-[#251832]">
+                      <img
+                        src={event.image_url}
+                        alt={event.title}
+                        className="size-full object-cover"
+                      />
+                      <span className="absolute top-3.5 left-3.5 rounded-[20px] bg-[#10091be8] px-3 py-[7px] text-[11px] text-[#d4aaff]">
+                        {event.subtitle || "Konser"}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex min-h-[190px] flex-col justify-end gap-3 bg-[linear-gradient(135deg,#51316e,#1c1229)] p-[25px]">
+                      <span className="text-xs text-[#e3c8ff]">
+                        {event.subtitle || "Konser"}
+                      </span>
+                      <strong className="text-[25px] [overflow-wrap:anywhere]">
+                        {event.title}
+                      </strong>
+                    </div>
+                  )}
 
                   <div className="p-[22px]">
+                    {event.image_url && (
+                      <h3 className="m-0 font-heading text-[19px]">
+                        {event.title}
+                      </h3>
+                    )}
                     <p className="mt-2 mb-[18px] text-[13px] text-[#bd83ff]">
-                      {event.artist}
+                      {event.artist || "-"}
                     </p>
 
                     <div className="flex flex-col gap-2.5 border-y border-[#39274b] py-[15px]">
                       <p className="m-0 text-xs text-[#c9bed8]">
-                        📅 {event.date}
+                        📅 {formatDisplayDate(event.event_date)}
                       </p>
                       <p className="m-0 text-xs text-[#c9bed8]">
-                        📍 {event.venue}, {event.location}
+                        📍 {event.venue}
+                        {event.location ? `, ${event.location}` : ""}
                       </p>
                       <p className="m-0 text-xs text-[#c9bed8]">
-                        🎟️ Kapasitas: {event.capacity} tiket
+                        🎟️ Kapasitas: {event.totalQuota} tiket
                       </p>
                       <p className="m-0 text-xs text-[#c9bed8]">
-                        🏢 {event.organizer}
+                        🏢 {currentUser?.organization || currentUser?.name}
                       </p>
                     </div>
 
                     <div className="mt-[18px] flex flex-col gap-[7px] text-[11px] text-[#b9a9d0]">
                       Harga tiket mulai dari
                       <strong className="text-[17px] text-[#d4aaff]">
-                        {formatPrice(event.price)}
+                        {formatPrice(event.minPrice)}
                       </strong>
                     </div>
 
@@ -533,7 +695,7 @@ export default function OrganizerEventsPage() {
 
         <div className="grid grid-cols-2 gap-[22px] max-[850px]:grid-cols-1">
           {concerts.map((concert) => {
-            const stats = getEventStats(concert);
+            const stats = getEventStats(concert.id);
 
             return (
               <article

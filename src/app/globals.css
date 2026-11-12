@@ -124,7 +124,6 @@ h4 {
 }
 
 .navbar .logo,
-.footer .logo,
 .auth-logo {
   color: #f8fafc;
 }
@@ -2154,21 +2153,6 @@ h4 {
 }
 
 /* GLOBAL FOOTER */
-
-.encore-global-footer {
-  position: relative;
-  z-index: 1;
-  flex-shrink: 0;
-  width: 100%;
-  overflow: hidden;
-  background: #0d0a1b;
-  border-top: 1px solid #302747;
-  color: #f8fafc;
-}
-
-.encore-global-footer * {
-  box-sizing: border-box;
-}
 
 .encore-footer-accent {
   position: absolute;

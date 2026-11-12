@@ -1,21 +1,23 @@
-
 "use client";
-
+ 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { concerts, formatPrice } from "../../data/concerts";
-
+ 
+const tag =
+  "rounded-[5px] border border-[rgba(167,139,250,0.18)] bg-[rgba(139,92,246,0.1)] px-[9px] py-1.5 text-[10px] text-[#c4b5fd]";
+ 
 export default function ConcertPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("Semua");
   const [genre, setGenre] = useState("Semua Genre");
   const [today, setToday] = useState(null);
   const [allConcerts, setAllConcerts] = useState(concerts);
-
+ 
   // ======================================
   // 01. TANGGAL INDONESIA
   // ======================================
-
+ 
   useEffect(() => {
     const parts = new Intl.DateTimeFormat("en-US", {
       timeZone: "Asia/Jakarta",
@@ -23,26 +25,26 @@ export default function ConcertPage() {
       month: "2-digit",
       day: "2-digit",
     }).formatToParts(new Date());
-
+ 
     const values = Object.fromEntries(
       parts.map((part) => [part.type, part.value])
     );
-
+ 
     setToday(
       `${values.year}-${values.month}-${values.day}`
     );
   }, []);
-
+ 
   // ======================================
   // 01B. AMBIL EVENT BUATAN ORGANIZER
   // ======================================
-
+ 
   useEffect(() => {
     try {
       const savedEvents = JSON.parse(
         localStorage.getItem("encoreCustomConcerts") || "[]"
       );
-
+ 
       setAllConcerts([
         ...concerts,
         ...savedEvents.filter(
@@ -54,40 +56,40 @@ export default function ConcertPage() {
       setAllConcerts(concerts);
     }
   }, []);
-
+ 
   // ======================================
   // 02. STATUS KONSER
   // ======================================
-
+ 
   const getStatus = (concert) => {
     if (!today || !concert.dateISO) {
       return "Memuat status";
     }
-
+ 
     if (concert.dateISO > today) return "Mendatang";
     if (concert.dateISO === today) return "Berlangsung";
-
+ 
     return "Selesai";
   };
-
+ 
   // ======================================
   // 03. FILTER GENRE
   // ======================================
-
+ 
   const genres = [
     "Semua Genre",
     ...new Set(
       allConcerts.map((concert) => concert.genre).filter(Boolean)
     ),
   ];
-
+ 
   // ======================================
   // 04. FILTER KONSER
   // ======================================
-
+ 
   const filteredConcerts = allConcerts.filter((concert) => {
     const keyword = search.toLowerCase().trim();
-
+ 
     const matchSearch = [
       concert.title,
       concert.artist,
@@ -95,38 +97,44 @@ export default function ConcertPage() {
     ].some((value) =>
       String(value ?? "").toLowerCase().includes(keyword)
     );
-
+ 
     const matchStatus =
       status === "Semua" ||
       getStatus(concert) === status;
-
+ 
     const matchGenre =
       genre === "Semua Genre" ||
       concert.genre === genre;
-
+ 
     return matchSearch && matchStatus && matchGenre;
   });
-
+ 
   // ======================================
-  // 05. TAMPILAN HALAMAN
+  // 05. KELAS TAILWIND
   // ======================================
-
+ 
+  const tabBase =
+    "min-h-12 cursor-pointer rounded-[11px] border px-[25px] text-[13px] font-semibold transition duration-[250ms] max-[640px]:min-h-10 max-[640px]:px-[15px] max-[640px]:text-[11px]";
+  const tabIdle =
+    "border-[rgba(167,139,250,0.2)] bg-[rgba(20,15,38,0.88)] text-[#c8bfdc] hover:border-[#8b5cf6] hover:text-white";
+  const tabActive = "border-[#8b5cf6] bg-[#8b5cf6] text-white";
+ 
+  // ======================================
+  // 06. TAMPILAN HALAMAN
+  // ======================================
+ 
   return (
-    <main className="concert-page">
-
+    <main className="relative isolate min-h-screen w-full overflow-hidden bg-[#090714] text-white">
       {/* BACKGROUND */}
-
-      <div className="concert-background" />
-      <div className="concert-background-overlay" />
-
-      <section className="events-section explore-section">
-
-        {/* SEARCH */}
-
-        <div className="explore-controls">
-
-          <div className="search-box explore-search">
-
+ 
+      <div className="pointer-events-none absolute inset-0 z-[-2] bg-[url('/images/bg%20concerts.jpg')] bg-cover bg-[position:center_top] bg-no-repeat" />
+      <div className="pointer-events-none absolute inset-0 z-[-1] bg-[linear-gradient(180deg,rgba(9,7,20,0.68)_0%,rgba(9,7,20,0.82)_45%,rgba(9,7,20,0.96)_100%)]" />
+ 
+      <section className="relative z-[2] m-0 w-full bg-transparent px-[7%] pt-7 pb-[65px] max-[1024px]:px-[5%] max-[640px]:pt-5 max-[640px]:pb-[45px]">
+        {/* SEARCH + GENRE */}
+ 
+        <div className="mb-[22px] flex w-full items-center gap-3.5 max-[640px]:mb-4 max-[640px]:flex-col max-[640px]:items-stretch max-[640px]:gap-2.5">
+          <div className="flex h-[52px] min-h-[52px] min-w-0 flex-1 items-center gap-3 rounded-[11px] border border-[rgba(196,181,253,0.24)] bg-[rgba(16,12,31,0.9)] px-[18px] backdrop-blur-[12px] transition-[border-color,background-color] duration-[250ms] focus-within:border-[#a78bfa] focus-within:bg-[rgba(20,15,38,0.96)] max-[640px]:w-full">
             <svg
               viewBox="0 0 24 24"
               width="19"
@@ -136,39 +144,38 @@ export default function ConcertPage() {
               strokeWidth="1.8"
               strokeLinecap="round"
               aria-hidden="true"
+              className="shrink-0 text-[#b9a6e9]"
             >
               <circle cx="10.8" cy="10.8" r="6.8" />
               <path d="m16 16 4 4" />
             </svg>
-
+ 
             <input
               type="search"
               placeholder="Cari konser, artis, atau kota..."
               aria-label="Cari konser, artis, atau kota"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              className="h-full w-full min-w-0 flex-1 border-none bg-transparent p-0 text-[13px] text-white outline-none placeholder:text-[#91889f] [&::-webkit-search-cancel-button]:hidden"
             />
-
+ 
             {search && (
               <button
                 type="button"
-                className="concert-search-clear"
                 onClick={() => setSearch("")}
                 aria-label="Hapus pencarian"
+                className="flex size-[25px] cursor-pointer items-center justify-center border-none bg-transparent p-0 text-[22px] text-[#b9a6e9]"
               >
                 ×
               </button>
             )}
-
           </div>
-
-          {/* GENRE */}
-
+ 
           <select
-            className="genre-select"
             value={genre}
             onChange={(e) => setGenre(e.target.value)}
             aria-label="Pilih genre musik"
+            className="h-[52px] min-h-[52px] w-[200px] shrink-0 cursor-pointer rounded-[11px] border border-[rgba(196,181,253,0.24)] bg-[rgba(16,12,31,0.94)] px-4 text-[13px] text-white outline-none hover:border-[#a78bfa] focus:border-[#a78bfa] max-[640px]:h-[50px] max-[640px]:min-h-[50px] max-[640px]:w-full [&_option]:bg-[#151126] [&_option]:text-white"
           >
             {genres.map((item) => (
               <option key={item} value={item}>
@@ -176,592 +183,114 @@ export default function ConcertPage() {
               </option>
             ))}
           </select>
-
         </div>
-
+ 
         {/* STATUS FILTER */}
-
-        <div className="explore-status-tabs">
-
-          {[
-            "Semua",
-            "Mendatang",
-            "Berlangsung",
-            "Selesai",
-          ].map((item) => (
+ 
+        <div className="mb-[30px] flex w-full flex-wrap items-center gap-3 max-[640px]:mb-[23px] max-[640px]:gap-2">
+          {["Semua", "Mendatang", "Berlangsung", "Selesai"].map((item) => (
             <button
               key={item}
               type="button"
-              className={status === item ? "active" : ""}
               onClick={() => setStatus(item)}
+              className={`${tabBase} ${status === item ? tabActive : tabIdle}`}
             >
               {item}
             </button>
           ))}
-
         </div>
-
+ 
         {/* RESULT COUNT */}
-
-        <p className="explore-result-count">
+ 
+        <p className="mb-[27px] text-[13px] leading-[1.6] text-[#c1b8d5] max-[640px]:mb-5">
           {today === null && status !== "Semua"
             ? "Memuat konser..."
             : `Menampilkan ${filteredConcerts.length} konser`}
         </p>
-
+ 
         {/* CONCERT GRID */}
-
-        <div className="concert-grid encore-four-grid">
-
+ 
+        <div className="m-0 grid w-full grid-cols-4 gap-6 bg-transparent p-0 max-[1024px]:grid-cols-2 max-[1024px]:gap-5 max-[640px]:grid-cols-1 max-[640px]:gap-[18px]">
           {filteredConcerts.map((concert) => (
             <article
-              className="concert-card"
               key={concert.id}
+              className="group flex w-full min-w-0 flex-col overflow-hidden rounded-[13px] border border-[rgba(196,181,253,0.1)] bg-[rgba(13,10,27,0.94)] transition-[transform,border-color] duration-[250ms] hover:-translate-y-1 hover:border-[rgba(167,139,250,0.45)] hover:shadow-[0_10px_30px_#8b5cf615]"
             >
-
-              <div className="concert-image">
-
+              {/* POSTER */}
+ 
+              <div className="relative h-[190px] w-full overflow-hidden bg-[#090714] max-[700px]:h-[230px]">
                 <img
                   src={concert.image || "/images/default-concert.jpg"}
                   alt={concert.title}
                   loading="lazy"
+                  className="block size-full object-cover object-center transition-transform duration-[400ms] group-hover:scale-[1.035]"
                 />
-
-                <span className="category-badge">
+ 
+                <span className="absolute top-[13px] left-[13px] rounded-[7px] bg-[rgba(13,10,27,0.94)] px-3 py-[7px] text-[11px] font-semibold text-[#c4b5fd]">
                   {concert.category || "Konser"}
                 </span>
-
               </div>
-
-              <div className="concert-info">
-
-                <p className="concert-date">
+ 
+              {/* INFO */}
+ 
+              <div className="flex min-w-0 flex-1 flex-col p-[17px]">
+                <p className="mb-[9px] text-xs text-[#a78bfa]">
                   {concert.date}
                 </p>
-
-                <h3>{concert.title}</h3>
-
-                <p className="artist">
+ 
+                <h3 className="mb-[7px] text-base leading-[1.4] font-[750] text-white">
+                  {concert.title}
+                </h3>
+ 
+                <p className="mb-[9px] text-xs leading-[1.6] text-[#c3bbd2]">
                   {concert.artist}
                 </p>
-
-                <p className="location">
+ 
+                <p className="mb-[13px] text-xs text-[#a49bb5]">
                   ⌖ {concert.location}
                 </p>
-
-                <div className="concert-tags">
-
+ 
+                <div className="mt-3.5 mb-[17px] flex flex-wrap gap-[7px]">
                   {concert.genre && (
-                    <span>{concert.genre}</span>
+                    <span className={tag}>{concert.genre}</span>
                   )}
-
-                  <span>{getStatus(concert)}</span>
-
+ 
+                  <span className={tag}>{getStatus(concert)}</span>
                 </div>
-
-                <div className="card-bottom">
-
-                  <div>
-                    <span className="price-label">
+ 
+                <div className="mt-auto flex items-end justify-between gap-2.5 border-t border-[rgba(196,181,253,0.12)] pt-[13px]">
+                  <div className="flex min-w-0 flex-col gap-[5px]">
+                    <span className="text-[10px] text-[#91889f]">
                       Mulai dari
                     </span>
-
-                    <strong>
+ 
+                    <strong className="text-[13px] leading-[1.4] font-bold text-white">
                       {formatPrice(concert.price)}
                     </strong>
                   </div>
-
+ 
                   <Link
                     href={`/concerts/${concert.id}`}
-                    className="detail-btn"
                     aria-label={`Lihat detail ${concert.title}`}
+                    className="inline-flex min-h-[35px] shrink-0 items-center justify-center rounded-[7px] border border-[#6d3be8] bg-[#8b5cf6] px-[15px] text-[11px] font-[650] whitespace-nowrap text-white transition duration-[250ms] hover:bg-[#7042d4]"
                   >
                     Detail
                   </Link>
-
                 </div>
-
               </div>
-
             </article>
           ))}
-
         </div>
-
+ 
         {/* EMPTY STATE */}
-
+ 
         {filteredConcerts.length === 0 &&
           !(today === null && status !== "Semua") && (
-            <p className="empty-state">
+            <p className="px-[15px] py-[50px] text-center text-sm text-[#b9a6e9]">
               Konser tidak ditemukan. Coba kata kunci atau filter lainnya.
             </p>
           )}
-
       </section>
-
-      {/* ======================================
-          06. CSS HALAMAN CONCERTS
-          LANGSUNG DI PAGE.JS
-      ====================================== */}
-
-      <style>{`
-
-        /* MAIN PAGE */
-
-        .concert-page {
-          position: relative;
-          isolation: isolate;
-          min-height: 100vh;
-          width: 100%;
-          color: #ffffff;
-          background: #090714;
-          overflow: hidden;
-        }
-
-        .concert-page * {
-          box-sizing: border-box;
-        }
-
-        /* BACKGROUND */
-
-        .concert-background {
-          position: absolute;
-          z-index: -2;
-          inset: 0;
-          background-image: url("/images/bg%20concerts.jpg");
-          background-position: center top;
-          background-size: cover;
-          background-repeat: no-repeat;
-          pointer-events: none;
-        }
-
-        .concert-background-overlay {
-          position: absolute;
-          z-index: -1;
-          inset: 0;
-          background: linear-gradient(
-            180deg,
-            rgba(9, 7, 20, 0.68) 0%,
-            rgba(9, 7, 20, 0.82) 45%,
-            rgba(9, 7, 20, 0.96) 100%
-          );
-          pointer-events: none;
-        }
-
-        /* CONTENT SECTION */
-
-        .concert-page .events-section,
-        .concert-page .explore-section {
-          position: relative;
-          z-index: 2;
-          width: 100%;
-          padding: 28px 7% 65px;
-          margin: 0;
-          background: transparent !important;
-        }
-
-        /* SEARCH AND GENRE */
-
-        .concert-page .explore-controls {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          width: 100%;
-          max-width: none;
-          margin: 0 0 22px;
-          padding: 0;
-        }
-
-        /* SEARCH BOX */
-
-        .concert-page .search-box.explore-search {
-          display: flex;
-          align-items: center;
-          flex: 1;
-          width: auto;
-          min-width: 0;
-          height: 52px;
-          gap: 12px;
-          padding: 0 18px;
-          border: 1px solid rgba(196, 181, 253, 0.24);
-          border-radius: 11px;
-          background: rgba(16, 12, 31, 0.90);
-          backdrop-filter: blur(12px);
-          box-shadow: none;
-          transition: border-color 0.25s ease,
-            background 0.25s ease;
-        }
-
-        .concert-page .search-box.explore-search:focus-within {
-          border-color: #a78bfa;
-          background: rgba(20, 15, 38, 0.96);
-        }
-
-        .concert-page .explore-search svg {
-          flex-shrink: 0;
-          color: #b9a6e9;
-        }
-
-        .concert-page .explore-search input {
-          flex: 1;
-          width: 100%;
-          min-width: 0;
-          height: 100%;
-          padding: 0;
-          margin: 0;
-          border: none;
-          outline: none;
-          background: transparent;
-          color: #ffffff;
-          box-shadow: none;
-          font-family: inherit;
-          font-size: 13px;
-        }
-
-        .concert-page .explore-search input::placeholder {
-          color: #91889f;
-        }
-
-        .concert-page .explore-search input::-webkit-search-cancel-button {
-          display: none;
-        }
-
-        .concert-page .concert-search-clear {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 25px;
-          height: 25px;
-          padding: 0;
-          border: none;
-          background: transparent;
-          color: #b9a6e9;
-          font-size: 22px;
-          cursor: pointer;
-        }
-
-        /* GENRE SELECT */
-
-        .concert-page .genre-select {
-          flex-shrink: 0;
-          width: 190px;
-          height: 52px;
-          padding: 0 16px;
-          border: 1px solid rgba(196, 181, 253, 0.24);
-          border-radius: 11px;
-          outline: none;
-          background-color: rgba(16, 12, 31, 0.94);
-          color: #ffffff;
-          font-family: inherit;
-          font-size: 13px;
-          cursor: pointer;
-        }
-
-        .concert-page .genre-select:focus {
-          border-color: #a78bfa;
-        }
-
-        .concert-page .genre-select option {
-          background: #151126;
-          color: #ffffff;
-        }
-
-        /* STATUS TABS */
-
-        .concert-page .explore-status-tabs {
-          display: flex;
-          align-items: center;
-          flex-wrap: wrap;
-          gap: 12px;
-          width: 100%;
-          margin: 0 0 30px;
-        }
-
-        .concert-page .explore-status-tabs button {
-          min-height: 48px;
-          padding: 0 25px;
-          border: 1px solid rgba(167, 139, 250, 0.20);
-          border-radius: 11px;
-          background: rgba(20, 15, 38, 0.88);
-          color: #c8bfdc;
-          font-family: inherit;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: 0.25s ease;
-        }
-
-        .concert-page .explore-status-tabs button:hover {
-          border-color: #8b5cf6;
-          color: #ffffff;
-        }
-
-        .concert-page .explore-status-tabs button.active {
-          border-color: #8b5cf6;
-          background: #8b5cf6;
-          color: #ffffff;
-        }
-
-        /* RESULT COUNT */
-
-        .concert-page .explore-result-count {
-          margin: 0 0 27px;
-          color: #c1b8d5;
-          font-size: 13px;
-          line-height: 1.6;
-        }
-
-        /* CONCERT GRID */
-
-        .concert-page .concert-grid {
-          display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 24px;
-          width: 100%;
-          margin: 0;
-          padding: 0;
-          background: transparent;
-        }
-
-        .concert-page .concert-card {
-          display: flex;
-          flex-direction: column;
-          width: 100%;
-          min-width: 0;
-          max-width: none;
-          overflow: hidden;
-          border: 1px solid rgba(196, 181, 253, 0.10);
-          border-radius: 13px;
-          background: rgba(13, 10, 27, 0.94);
-          transition: transform 0.25s ease,
-            border-color 0.25s ease;
-        }
-
-        .concert-page .concert-card:hover {
-          transform: translateY(-4px);
-          border-color: rgba(167, 139, 250, 0.45);
-        }
-
-        /* POSTER */
-
-        .concert-page .concert-image {
-          position: relative;
-          width: 100%;
-          aspect-ratio: 3 / 4;
-          padding: 0;
-          overflow: hidden;
-          background: #090714;
-        }
-
-        .concert-page .concert-image img {
-          display: block;
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          object-position: center;
-          transition: transform 0.4s ease;
-        }
-
-        .concert-page .concert-card:hover .concert-image img {
-          transform: scale(1.035);
-        }
-
-        .concert-page .category-badge {
-          position: absolute;
-          top: 13px;
-          left: 13px;
-          padding: 7px 12px;
-          border-radius: 7px;
-          background: rgba(13, 10, 27, 0.94);
-          color: #c4b5fd;
-          font-size: 11px;
-          font-weight: 600;
-        }
-
-        /* CONCERT INFORMATION */
-
-        .concert-page .concert-info {
-          display: flex;
-          flex: 1;
-          flex-direction: column;
-          min-width: 0;
-          padding: 17px;
-        }
-
-        .concert-page .concert-date {
-          margin: 0 0 9px;
-          color: #a78bfa;
-          font-size: 12px;
-        }
-
-        .concert-page .concert-info h3 {
-          margin: 0 0 7px;
-          color: #ffffff;
-          font-size: 16px;
-          font-weight: 750;
-          line-height: 1.4;
-        }
-
-        .concert-page .artist {
-          margin: 0 0 9px;
-          color: #c3bbd2;
-          font-size: 12px;
-          line-height: 1.6;
-        }
-
-        .concert-page .location {
-          margin: 0 0 13px;
-          color: #a49bb5;
-          font-size: 12px;
-        }
-
-        /* TAGS */
-
-        .concert-page .concert-tags {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 7px;
-          margin-bottom: 17px;
-        }
-
-        .concert-page .concert-tags span {
-          padding: 6px 9px;
-          border: 1px solid rgba(167, 139, 250, 0.18);
-          border-radius: 5px;
-          background: rgba(139, 92, 246, 0.10);
-          color: #c4b5fd;
-          font-size: 10px;
-        }
-
-        /* PRICE AND DETAIL */
-
-        .concert-page .card-bottom {
-          display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
-          gap: 10px;
-          margin-top: auto;
-          padding-top: 13px;
-          border-top: 1px solid rgba(196, 181, 253, 0.12);
-        }
-
-        .concert-page .card-bottom > div {
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
-          min-width: 0;
-        }
-
-        .concert-page .price-label {
-          color: #91889f;
-          font-size: 10px;
-        }
-
-        .concert-page .card-bottom strong {
-          color: #ffffff;
-          font-size: 13px;
-          line-height: 1.4;
-        }
-
-        .concert-page .detail-btn {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          min-height: 35px;
-          padding: 0 15px;
-          border-radius: 7px;
-          background: #8b5cf6;
-          color: #ffffff;
-          font-size: 11px;
-          font-weight: 650;
-          text-decoration: none;
-          transition: 0.25s ease;
-        }
-
-        .concert-page .detail-btn:hover {
-          background: #7042d4;
-        }
-
-        /* EMPTY STATE */
-
-        .concert-page .empty-state {
-          padding: 50px 15px;
-          color: #b9a6e9;
-          font-size: 14px;
-          text-align: center;
-        }
-
-        /* TABLET */
-
-        @media (min-width: 641px) and (max-width: 1024px) {
-
-          .concert-page .concert-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 20px;
-          }
-
-          .concert-page .events-section {
-            padding-left: 5%;
-            padding-right: 5%;
-          }
-
-        }
-
-        /* MOBILE */
-
-        @media (max-width: 640px) {
-
-          .concert-page .events-section,
-          .concert-page .explore-section {
-            padding: 20px 5% 45px;
-          }
-
-          .concert-page .explore-controls {
-            flex-direction: column;
-            align-items: stretch;
-            gap: 10px;
-            margin-bottom: 16px;
-          }
-
-          .concert-page .search-box.explore-search {
-            width: 100%;
-            height: 46px;
-          }
-
-          .concert-page .genre-select {
-            width: 100%;
-            height: 44px;
-          }
-
-          .concert-page .explore-status-tabs {
-            gap: 8px;
-            margin-bottom: 23px;
-          }
-
-          .concert-page .explore-status-tabs button {
-            min-height: 40px;
-            padding: 0 15px;
-            font-size: 11px;
-          }
-
-          .concert-page .explore-result-count {
-            margin-bottom: 20px;
-          }
-
-          .concert-page .concert-grid {
-            grid-template-columns: minmax(0, 1fr);
-            gap: 18px;
-          }
-
-          .concert-page .concert-image {
-            aspect-ratio: 3 / 4;
-          }
-
-        }
-
-      `}</style>
-
     </main>
   );
 }

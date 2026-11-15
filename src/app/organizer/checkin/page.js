@@ -1,0 +1,512 @@
+
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "../../../lib/supabase";
+
+export default function CheckinPage() {
+  const router = useRouter();
+  const scannerRef = useRef(null);
+  const processingRef = useRef(false);
+
+  const [currentUser, setCurrentUser] = useState(null);
+  const [allowedEventIds, setAllowedEventIds] = useState(null);
+  const [code, setCode] = useState("");
+  const [result, setResult] = useState(null);
+  const [scannerActive, setScannerActive] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function checkAccess() {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+          router.replace("/login?redirect=/organizer/checkin");
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        if (!profile) {
+          router.replace("/login");
+          return;
+        }
+
+        const allowedRoles = ["admin", "organizer", "checkin"];
+
+        if (!allowedRoles.includes(profile.role)) {
+          router.replace(
+            profile.role === "buyer" ? "/buyer/dashboard" : "/login"
+          );
+          return;
+        }
+
+        if (profile.role !== "admin" && profile.status !== "active") {
+          await supabase.auth.signOut();
+          router.replace("/login");
+          return;
+        }
+
+        let eventIds = null;
+
+        if (profile.role === "organizer") {
+          const { data } = await supabase
+            .from("events")
+            .select("id")
+            .eq("organizer_id", user.id);
+
+          eventIds = (data || []).map((event) => event.id);
+        } else if (profile.role === "checkin") {
+          const { data } = await supabase
+            .from("event_staff")
+            .select("event_id")
+            .eq("staff_id", user.id);
+
+          eventIds = (data || []).map((item) => item.event_id);
+        }
+
+        if (mounted) {
+          setCurrentUser(profile);
+          setAllowedEventIds(eventIds);
+          setReady(true);
+        }
+      } catch (error) {
+        console.error("Gagal memeriksa akses:", error);
+        router.replace("/login");
+      }
+    }
+
+    checkAccess();
+
+    return () => {
+      mounted = false;
+    };
+  }, [router]);
+
+  useEffect(() => {
+    return () => {
+      const scanner = scannerRef.current;
+
+      if (scanner) {
+        scanner.stop().catch(() => {});
+        scanner.clear();
+        scannerRef.current = null;
+      }
+    };
+  }, []);
+
+  async function validateTicket(ticketCode) {
+    const cleanCode = ticketCode.trim().toUpperCase();
+
+    if (!cleanCode) {
+      setResult({
+        type: "invalid",
+        message: "Masukkan kode tiket terlebih dahulu.",
+      });
+      return;
+    }
+
+    setValidating(true);
+
+    try {
+      const { data: ticket, error } = await supabase
+        .from("tickets")
+        .select(`
+          *,
+          events (id, title),
+          ticket_types (name),
+          orders (
+            id,
+            buyer_name,
+            buyer_email,
+            payment_status
+          )
+        `)
+        .ilike("ticket_code", cleanCode)
+        .maybeSingle();
+
+      if (error) {
+        setResult({
+          type: "invalid",
+          message: "Gagal memeriksa tiket: " + error.message,
+        });
+        return;
+      }
+
+      if (!ticket) {
+        setResult({
+          type: "invalid",
+          message: "Kode tiket tidak ditemukan.",
+        });
+        return;
+      }
+
+      if (
+        Array.isArray(allowedEventIds) &&
+        !allowedEventIds.includes(ticket.event_id)
+      ) {
+        setResult({
+          type: "invalid",
+          message: "Kamu tidak memiliki akses untuk event ini.",
+        });
+        return;
+      }
+
+      if (!ticket.orders || ticket.orders.payment_status !== "paid") {
+        setResult({
+          type: "invalid",
+          message: "Pembayaran tiket belum berhasil atau belum lunas.",
+        });
+        return;
+      }
+
+      const formattedTicket = {
+        ticketCode: ticket.ticket_code,
+        buyerName:
+          ticket.holder_name ||
+          ticket.orders?.buyer_name ||
+          ticket.orders?.buyer_email ||
+          "-",
+        eventTitle: ticket.events?.title || "-",
+        ticketType: ticket.ticket_types?.name || "Regular",
+      };
+
+      if (ticket.checked_in) {
+        setResult({
+          type: "used",
+          message: "Tiket ini sudah pernah digunakan untuk check-in.",
+          ticket: formattedTicket,
+        });
+        return;
+      }
+
+      const { error: updateError } = await supabase
+        .from("tickets")
+        .update({
+          checked_in: true,
+          checked_in_at: new Date().toISOString(),
+        })
+        .eq("id", ticket.id)
+        .eq("checked_in", false);
+
+      if (updateError) {
+        setResult({
+          type: "invalid",
+          message: "Gagal memperbarui status: " + updateError.message,
+        });
+        return;
+      }
+
+      setResult({
+        type: "success",
+        message: "Check-in berhasil! Selamat menikmati konser.",
+        ticket: formattedTicket,
+      });
+
+      setCode("");
+    } catch (error) {
+      console.error("Validasi tiket gagal:", error);
+      setResult({
+        type: "invalid",
+        message: "Terjadi kesalahan saat membaca data tiket.",
+      });
+    } finally {
+      setValidating(false);
+    }
+  }
+
+  async function stopScanner() {
+    const scanner = scannerRef.current;
+    if (!scanner) return;
+
+    try {
+      await scanner.stop();
+      scanner.clear();
+    } catch (error) {
+      console.error("Gagal menghentikan scanner:", error);
+    }
+
+    scannerRef.current = null;
+    setScannerActive(false);
+  }
+
+  async function startScanner() {
+    if (scannerRef.current || loading) return;
+
+    setLoading(true);
+    setCameraError("");
+    setResult(null);
+
+    try {
+      const { Html5Qrcode } = await import("html5-qrcode");
+      const scanner = new Html5Qrcode("encore-qr-reader");
+
+      scannerRef.current = scanner;
+
+      await scanner.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 230, height: 230 },
+        },
+        async (decodedText) => {
+          if (processingRef.current) return;
+
+          processingRef.current = true;
+          setCode(decodedText);
+
+          try {
+            await stopScanner();
+            await validateTicket(decodedText);
+          } finally {
+            processingRef.current = false;
+          }
+        },
+        () => {}
+      );
+
+      setScannerActive(true);
+    } catch (error) {
+      console.error("Kamera gagal dibuka:", error);
+      scannerRef.current = null;
+      setScannerActive(false);
+      setCameraError(
+        "Kamera tidak dapat dibuka. Izinkan akses kamera atau gunakan input manual."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setResult(null);
+    await validateTicket(code);
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    localStorage.removeItem("encoreCurrentUser");
+    router.push("/login");
+  }
+
+  if (!ready || !currentUser) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-[#100b1c] text-white">
+        Memeriksa akses ENCORE...
+      </div>
+    );
+  }
+
+  const resultStyles = {
+    success: "border-[#367b5a] bg-[#193629]",
+    used: "border-[#99743b] bg-[#3b2e19]",
+    invalid: "border-[#8b3c49] bg-[#402129]",
+  };
+
+  return (
+    <main className="box-border min-h-screen bg-[#100b1c] px-5 pb-10 text-[#f7f3ff] max-[550px]:px-3.5 max-[550px]:pb-[25px]">
+      <section className="mx-auto mt-[45px] max-w-[720px] max-[550px]:mt-[30px]">
+        <div className="mb-7 text-center">
+          <p className="text-[10px] font-bold tracking-[2px] text-[#b77aff]">
+            ENCORE EVENT MANAGEMENT
+          </p>
+          <h1 className="my-3 text-[32px] font-bold max-[550px]:text-[25px]">
+            QR Ticket Scanner
+          </h1>
+          <p className="text-[13px] leading-[1.7] text-[#a99ab7]">
+            Pindai QR Code e-ticket untuk memvalidasi tiket dan mencatat
+            kehadiran pengunjung.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-[#49365b] bg-[#1a1226] p-[27px] max-[550px]:p-[17px]">
+          <div className="mb-[22px] flex items-center justify-between gap-3">
+            <div className="flex items-center gap-[13px]">
+              <span className="grid size-[45px] place-items-center rounded-[10px] bg-[#382452] text-[22px] text-[#d0a4ff]">
+                ▣
+              </span>
+              <div>
+                <h2 className="text-[17px] font-bold">
+                  Scan Tiket Pengunjung
+                </h2>
+                <p className="mt-[5px] text-[11px] text-[#a99ab7]">
+                  Arahkan QR Code ke kamera scanner.
+                </p>
+              </div>
+            </div>
+
+            {currentUser.role === "checkin" && (
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-lg border border-[#49365b] px-3 py-2 text-xs text-[#c394ff]"
+              >
+                Keluar
+              </button>
+            )}
+          </div>
+
+          <div className="relative min-h-[280px] overflow-hidden rounded-xl border border-dashed border-[#62447c] bg-[#100b1c] max-[550px]:min-h-[230px]">
+            <div
+              id="encore-qr-reader"
+              className="relative z-[2] w-full [&_button]:m-2 [&_button]:rounded-md [&_button]:bg-[#a66be8] [&_button]:px-3 [&_button]:py-2 [&_button]:text-white [&_video]:!w-full [&_video]:object-cover"
+            />
+
+            {!scannerActive && (
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center text-[#a99ab7]">
+                <span className="text-[55px] text-[#b77aff]">▦</span>
+                <p className="mt-3 text-sm">Kamera scanner belum aktif</p>
+                <small className="mt-[7px] text-[11px]">
+                  Tekan tombol di bawah untuk memulai scan.
+                </small>
+              </div>
+            )}
+          </div>
+
+          {cameraError && (
+            <div className="mt-[13px] rounded-lg bg-[#49242c] p-3 text-xs leading-[1.6] text-[#ffb4be]">
+              {cameraError}
+            </div>
+          )}
+
+          <div className="mt-[17px]">
+            {!scannerActive ? (
+              <button
+                type="button"
+                onClick={startScanner}
+                disabled={loading}
+                className="w-full rounded-lg bg-[#a66be8] p-[13px] text-[13px] font-bold text-white disabled:opacity-60"
+              >
+                {loading ? "Membuka Kamera..." : "Aktifkan Kamera"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={stopScanner}
+                className="w-full rounded-lg bg-[#49334e] p-[13px] text-[13px] font-bold text-white"
+              >
+                Hentikan Scanner
+              </button>
+            )}
+          </div>
+
+          <div className="my-6 flex items-center gap-[15px] text-[10px] text-[#82728f] before:h-px before:flex-1 before:bg-[#49365b] before:content-[''] after:h-px after:flex-1 after:bg-[#49365b] after:content-['']">
+            <span>ATAU</span>
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            <label htmlFor="ticketCode" className="mb-2.5 block text-xs font-bold">
+              Masukkan Kode Tiket Manual
+            </label>
+
+            <input
+              id="ticketCode"
+              type="text"
+              placeholder="Contoh: ENCORE-123456"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              className="w-full rounded-lg border border-[#49365b] bg-[#100b1c] p-[13px] text-[13px] text-white outline-none placeholder:text-[#81738e] focus:border-[#b77aff]"
+            />
+
+            <button
+              type="submit"
+              disabled={validating}
+              className="mt-3 w-full rounded-lg bg-[#a66be8] p-[13px] text-[13px] font-bold text-white disabled:opacity-60"
+            >
+              {validating ? "Memvalidasi..." : "Validasi Tiket"}
+            </button>
+          </form>
+
+          {result && (
+            <div
+              className={`mt-[22px] rounded-xl border p-5 text-center ${
+                resultStyles[result.type] || resultStyles.invalid
+              }`}
+              role="status"
+            >
+              <div className="mx-auto mb-3 grid size-[42px] place-items-center rounded-full bg-white/10 text-2xl font-bold">
+                {result.type === "success"
+                  ? "✓"
+                  : result.type === "used"
+                    ? "!"
+                    : "×"}
+              </div>
+
+              <h3 className="text-[17px] font-bold">
+                {result.type === "success"
+                  ? "Tiket Valid"
+                  : result.type === "used"
+                    ? "Tiket Sudah Digunakan"
+                    : "Validasi Gagal"}
+              </h3>
+
+              <p className="mt-2 text-xs leading-[1.6]">{result.message}</p>
+
+              {result.ticket && (
+                <div className="mt-[18px] grid gap-3 border-t border-white/20 pt-[15px] text-left">
+                  <div>
+                    <span className="mb-[5px] block text-[10px] opacity-70">
+                      Kode Tiket
+                    </span>
+                    <strong className="block text-xs [overflow-wrap:anywhere]">
+                      {result.ticket.ticketCode}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span className="mb-[5px] block text-[10px] opacity-70">
+                      Event & Kategori
+                    </span>
+                    <strong className="block text-xs [overflow-wrap:anywhere]">
+                      {result.ticket.eventTitle} ({result.ticket.ticketType})
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span className="mb-[5px] block text-[10px] opacity-70">
+                      Nama Pemegang Tiket
+                    </span>
+                    <strong className="block text-xs [overflow-wrap:anywhere]">
+                      {result.ticket.buyerName}
+                    </strong>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-[25px] rounded-xl border border-[#302340] bg-[#171025] p-[22px]">
+          <h3 className="mb-[15px] text-[15px] font-bold">
+            Petunjuk Check-in
+          </h3>
+          <ol className="list-decimal pl-5 text-xs leading-[2] text-[#b8acc7]">
+            <li>Aktifkan kamera scanner.</li>
+            <li>Pindai QR Code pada e-ticket pengunjung.</li>
+            <li>Tunggu sistem memeriksa pembayaran dan status tiket.</li>
+            <li>Jika valid, sistem otomatis mencatat check-in.</li>
+            <li>Tiket yang sudah digunakan tidak bisa check-in lagi.</li>
+          </ol>
+        </div>
+
+        <footer className="mt-[35px] border-t border-[#302340] pt-5 text-center text-[11px] text-[#81738e]">
+          © 2026 ENCORE. All rights reserved.
+        </footer>
+      </section>
+    </main>
+  );
+}

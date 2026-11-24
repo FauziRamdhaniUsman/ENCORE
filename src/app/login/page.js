@@ -35,6 +35,12 @@ export default function LoginPage() {
     return null;
   };
 
+  const handleFillDemo = (demoEmail, demoPass) => {
+    setError("");
+    setEmail(demoEmail);
+    setPassword(demoPass);
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
@@ -235,7 +241,91 @@ export default function LoginPage() {
             Daftar sekarang
           </Link>
         </p>
-      </div>
+
+        {/* PETUNJUK ROLE & KREDENSIAL DEMO */}
+      <div className="mt-5 rounded-xl border border-white/15 bg-white/5 p-3.5 text-xs leading-relaxed text-slate-300">
+        <p className="mb-2 font-semibold text-white">
+          Petunjuk Akses & Akun Demo (URL Login: /login)
+        </p>
+
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <span>
+              <strong className="text-violet-400">Admin</strong>{" "}
+              (<code className="text-slate-200">/admin/dashboard</code>):
+              <br />
+              admin@encore.com / admin123
+            </span>
+            <button
+              type="button"
+              onClick={() => handleFillDemo("admin@encore.com", "admin123")}
+              className="cursor-pointer rounded-md border border-violet-400/50 bg-violet-500/15 px-2.5 py-1 text-[11px] font-medium text-violet-200 transition hover:bg-violet-500/25"
+            >
+              Isi
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <span>
+              <strong className="text-emerald-400">Organizer</strong>{" "}
+              (<code className="text-slate-200">/organizer/dashboard</code>):
+              <br />
+              organizer@encore.com / organizer123
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                handleFillDemo("organizer@encore.com", "organizer123")
+              }
+              className="cursor-pointer rounded-md border border-emerald-400/50 bg-emerald-500/15 px-2.5 py-1 text-[11px] font-medium text-emerald-200 transition hover:bg-emerald-500/25"
+            >
+              Isi
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <span>
+              <strong className="text-amber-400">Petugas Check-in</strong>{" "}
+              (<code className="text-slate-200">/organizer/checkin</code>):
+              <br />
+              checkin@encore.com / checkin123
+            </span>
+            <button
+              type="button"
+              onClick={() => handleFillDemo("checkin@encore.com", "checkin123")}
+              className="cursor-pointer rounded-md border border-amber-400/50 bg-amber-500/15 px-2.5 py-1 text-[11px] font-medium text-amber-200 transition hover:bg-amber-500/25"
+            >
+              Isi
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <span>
+              <strong className="text-sky-400">Buyer / User</strong>{" "}
+              (<code className="text-slate-200">/buyer/dashboard</code>):
+              <br />
+              buyer@encore.com / buyer123
+            </span>
+            <button
+              type="button"
+              onClick={() => handleFillDemo("buyer@encore.com", "buyer123")}
+              className="cursor-pointer rounded-md border border-sky-400/50 bg-sky-500/15 px-2.5 py-1 text-[11px] font-medium text-sky-200 transition hover:bg-sky-500/25"
+            >
+              Isi
+            </button>
+          </div>
+
+          <p className="mt-1 text-[11px] text-slate-400">
+            *Pengguna baru juga dapat mendaftar melalui menu{" "}
+            <Link href="/register" className="text-sky-400 underline hover:text-sky-300">
+              /register
+            </Link>{" "}
+            (role <strong>Buyer</strong> langsung aktif, sedangkan{" "}
+            <strong>Organizer</strong> menunggu persetujuan Admin).
+              </p>
+            </div>
+          </div>
+        </div>
 
       <p className={auth.footer}>© 2026 ENCORE. All rights reserved.</p>
     </main>

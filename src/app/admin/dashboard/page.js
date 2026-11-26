@@ -4,7 +4,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
-import { concerts } from "../../../data/concerts";
 
 const thClass =
   "border-b border-[#39274b] p-[15px] text-left text-[13px] font-bold text-[#bd83ff]";
@@ -80,20 +79,8 @@ export default function AdminDashboard() {
         // TOTAL EVENT:
         // Gabungkan konser bawaan dan event Supabase.
         // Set otomatis menghilangkan ID duplikat.
-        const staticEventIds = concerts.map(
-          (event) => String(event.id)
-        );
 
-        const supabaseEventIds = (eventsRes.data || []).map(
-          (event) => String(event.id)
-        );
-
-        const uniqueEventIds = new Set([
-          ...staticEventIds,
-          ...supabaseEventIds,
-        ]);
-
-        setEventsCount(uniqueEventIds.size);
+        setEventsCount((eventsRes.data || []).length);
 
         // Data pengguna
         if (profilesRes.data) {

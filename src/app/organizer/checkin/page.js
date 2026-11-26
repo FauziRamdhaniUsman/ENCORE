@@ -193,14 +193,15 @@ export default function CheckinPage() {
         return;
       }
 
-      const { error: updateError } = await supabase
-        .from("tickets")
-        .update({
-          checked_in: true,
-          checked_in_at: new Date().toISOString(),
+        const { error: updateError } = await supabase
+          .from("tickets")
+          .update({
+            checked_in: true,
+            checked_in_at: new Date().toISOString(),
+            checked_in_by: currentUser.id,
         })
-        .eq("id", ticket.id)
-        .eq("checked_in", false);
+          .eq("id", ticket.id)
+          .eq("checked_in", false);
 
       if (updateError) {
         setResult({

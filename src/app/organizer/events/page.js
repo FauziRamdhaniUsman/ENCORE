@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { concerts, formatPrice } from "../../../data/concerts";
+import { formatPrice } from "../../../lib/format";
 import { supabase } from "../../../lib/supabase";
 
 const inputClass =
@@ -607,7 +607,7 @@ export default function OrganizerEventsPage() {
   ).size;
 
   const totalTickets = paidTickets.length;
-  const totalEvents = concerts.length + myEvents.length;
+  const totalEvents = myEvents.length;
 
   if (loading) {
     return (
@@ -1377,122 +1377,6 @@ export default function OrganizerEventsPage() {
         )}
       </section>
 
-      {/* KATALOG EVENT ENCORE */}
-      <section className="mb-10">
-        <div className="mb-[22px] flex items-center justify-between gap-5 max-[650px]:flex-col max-[650px]:items-start">
-          <div>
-            <h2 className="m-0 mb-2 font-heading text-[22px] font-bold">
-              Katalog Event ENCORE
-            </h2>
-
-            <p className="text-sm text-[#b9a9d0]">
-              Daftar event bawaan yang tersedia di platform.
-            </p>
-          </div>
-
-          <span className="rounded-[20px] bg-[#291a3b] px-3.5 py-2 text-xs whitespace-nowrap text-[#d4aaff]">
-            {concerts.length} Event
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-[22px] max-[850px]:grid-cols-1">
-          {concerts.map((concert) => {
-            const stats = getEventStats(concert.id);
-
-            return (
-              <article
-                className="overflow-hidden rounded-[15px] border border-[#39274b] bg-[#1c1229]"
-                key={concert.id}
-              >
-                <div className="relative h-[190px] bg-[#251832]">
-                  <img
-                    src={concert.image}
-                    alt={concert.title}
-                    className="size-full object-cover"
-                  />
-
-                  <span className="absolute top-3.5 left-3.5 rounded-[20px] bg-[#10091be8] px-3 py-[7px] text-[11px] text-[#d4aaff]">
-                    {concert.category || "Konser"}
-                  </span>
-                </div>
-
-                <div className="p-[22px]">
-                  <h3 className="m-0 font-heading text-[19px]">
-                    {concert.title}
-                  </h3>
-
-                  <p className="mt-2 mb-[18px] text-[13px] text-[#bd83ff]">
-                    {concert.artist}
-                  </p>
-
-                  <div className="flex flex-col gap-2.5 border-y border-[#39274b] py-[15px]">
-                    <p className="m-0 text-xs text-[#c9bed8]">
-                      📅 {concert.date}
-                    </p>
-
-                    <p className="m-0 text-xs text-[#c9bed8]">
-                      📍 {concert.venue || concert.location}
-                    </p>
-
-                    <p className="m-0 text-xs text-[#c9bed8]">
-                      🏢{" "}
-                      {concert.organizer ||
-                        "Penyelenggara belum dicantumkan"}
-                    </p>
-                  </div>
-
-                  <div className="mt-[18px] flex flex-col gap-[7px] text-[11px] text-[#b9a9d0]">
-                    Harga tiket mulai dari
-
-                    <strong className="text-[17px] text-[#d4aaff]">
-                      {formatPrice(concert.price)}
-                    </strong>
-                  </div>
-
-                  <div className="mt-5 grid grid-cols-3 gap-2.5 rounded-[10px] bg-[#130c20] px-2.5 py-[15px]">
-                    <div className="flex min-w-0 flex-col gap-2">
-                      <span className="text-[10px] text-[#b9a9d0]">
-                        Pesanan
-                      </span>
-
-                      <strong className="text-[13px] [overflow-wrap:anywhere] text-[#c58aff]">
-                        {stats.orders}
-                      </strong>
-                    </div>
-
-                    <div className="flex min-w-0 flex-col gap-2">
-                      <span className="text-[10px] text-[#b9a9d0]">
-                        Tiket Terjual
-                      </span>
-
-                      <strong className="text-[13px] [overflow-wrap:anywhere] text-[#c58aff]">
-                        {stats.ticketsSold}
-                      </strong>
-                    </div>
-
-                    <div className="flex min-w-0 flex-col gap-2">
-                      <span className="text-[10px] text-[#b9a9d0]">
-                        Pendapatan
-                      </span>
-
-                      <strong className="text-[13px] [overflow-wrap:anywhere] text-[#c58aff]">
-                        {formatPrice(stats.revenue)}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <Link
-                    href={`/concerts/${concert.id}`}
-                    className="mt-[18px] block rounded-[9px] border border-[#7544a6] p-[13px] text-center text-xs font-bold text-[#d4aaff] transition hover:bg-[#7544a6] hover:text-white"
-                  >
-                    Lihat Detail Event →
-                  </Link>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
     </main>
   );
 }

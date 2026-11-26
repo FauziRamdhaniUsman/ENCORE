@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { concerts, formatPrice } from "../../data/concerts";
-import { supabase } from "../../lib/supabase";
+import { formatPrice } from "../../lib/format";
+import { fetchPublishedEvents } from "../../lib/events";
 
 const tag =
   "rounded-[5px] border border-[rgba(167,139,250,0.18)] bg-[rgba(139,92,246,0.1)] px-[9px] py-1.5 text-[10px] text-[#c4b5fd]";
@@ -95,8 +95,10 @@ export default function ConcertPage() {
   const [sortBy, setSortBy] = useState(DEFAULT_SORT);
   const [showFilters, setShowFilters] = useState(false);
   const [today, setToday] = useState(null);
-  const [allConcerts, setAllConcerts] = useState(concerts);
+  const [allConcerts, setAllConcerts] = useState([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -137,83 +139,37 @@ export default function ConcertPage() {
     setToday(`${values.year}-${values.month}-${values.day}`);
   }, []);
 
+  // Ambil konser dari Supabase (data yang dimasukkan organizer)
   useEffect(() => {
-    const fetchSupabaseEvents = async () => {
+    let cancelled = false;
+
+    const load = async () => {
       try {
-        const { data: eventsData, error } = await supabase
-          .from("events")
-          .select(
-            `
-            *,
-            ticket_types (
-              price
-            )
-          `
-          )
-          .order("event_date", { ascending: true });
-
-        if (error) {
-          console.error("Gagal memuat event dari Supabase:", error);
-          setAllConcerts(concerts);
-          return;
-        }
-
-        const mappedEvents = (eventsData || []).map((ev) => {
-          const ticketList = Array.isArray(ev.ticket_types)
-            ? ev.ticket_types
-            : [];
-          const minPrice =
-            ticketList.length > 0
-              ? Math.min(...ticketList.map((t) => Number(t.price || 0)))
-              : 0;
-
-          const parsedDate = ev.event_date ? new Date(ev.event_date) : null;
-          const isValidDate =
-            parsedDate && !Number.isNaN(parsedDate.getTime());
-
-          const dateISO = isValidDate
-            ? parsedDate.toISOString().slice(0, 10)
-            : "";
-
-          const formattedDate = isValidDate
-            ? parsedDate.toLocaleDateString("id-ID", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })
-            : ev.event_date || "-";
-
-          return {
-            id: ev.id,
-            title: ev.title,
-            artist: ev.artist || "ENCORE Artist",
-            date: formattedDate,
-            dateISO,
-            location: ev.location || ev.venue || "Indonesia",
-            venue: ev.venue || "",
-            category: ev.subtitle || "Konser",
-            genre: ev.subtitle || "Konser",
-            price: minPrice,
-            image: ev.image_url || "/images/default-concert.jpg",
-          };
-        });
-
-        setAllConcerts([
-          ...mappedEvents,
-          ...concerts.filter(
-            (item) => !mappedEvents.some((ev) => String(ev.id) === String(item.id))
-          ),
-        ]);
+        const events = await fetchPublishedEvents();
+        if (cancelled) return;
+        setAllConcerts(events);
+        setLoadError("");
       } catch (error) {
-        console.error("Gagal membaca event Organizer:", error);
-        setAllConcerts(concerts);
+        console.error("Gagal memuat event dari Supabase:", error);
+        if (!cancelled) {
+          setLoadError("Gagal memuat konser. Periksa koneksi lalu coba lagi.");
+        }
       } finally {
-        setLoadingEvents(false);
+        if (!cancelled) setLoadingEvents(false);
       }
     };
 
-    fetchSupabaseEvents();
-  }, []);
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
+  const retryLoad = () => {
+    setLoadingEvents(true);
+    setReloadKey((current) => current + 1);
+  };
 
   const getStatus = (concert) => {
     if (!today) return "Memuat status";
@@ -606,15 +562,32 @@ export default function ConcertPage() {
           ))}
         </div>
 
-        {sortedConcerts.length === 0 &&
+        {loadError && !loadingEvents && (
+          <div className="px-[15px] py-[50px] text-center">
+            <p className="text-sm text-[#fda4af]">{loadError}</p>
+
+            <button
+              type="button"
+              onClick={retryLoad}
+              className="mt-4 min-h-10 cursor-pointer rounded-full border border-[#5b3fa8] bg-[rgba(21,16,39,0.86)] px-5 text-[14px] font-semibold text-white transition hover:border-[#c4b5fd] hover:bg-[rgba(139,92,246,0.2)]"
+            >
+              Coba lagi
+            </button>
+          </div>
+        )}
+
+        {!loadError &&
+          sortedConcerts.length === 0 &&
           !loadingEvents &&
           !(today === null && status !== "Semua") && (
             <div className="px-[15px] py-[50px] text-center">
               <p className="text-sm text-[#b9a6e9]">
-                Konser tidak ditemukan. Coba kata kunci atau filter lainnya.
+                {allConcerts.length === 0
+                  ? "Belum ada konser yang dipublikasikan."
+                  : "Konser tidak ditemukan. Coba kata kunci atau filter lainnya."}
               </p>
 
-              {hasActiveFilter && (
+              {hasActiveFilter && allConcerts.length > 0 && (
                 <button
                   type="button"
                   onClick={resetFilters}

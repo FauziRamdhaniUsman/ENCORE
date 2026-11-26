@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { QRCodeCanvas } from "qrcode.react";
-import { concerts } from "../../../data/concerts";
+import { supabase } from "../../../lib/supabase";
 import BuyerAccountLayout from "../../../components/buyer-account-layout";
 
 const monthNames = {
@@ -51,6 +51,7 @@ export default function MyTicketsPage() {
   const router = useRouter();
 
   const [user, setUser] = useState(null);
+  const [ordersCount, setOrdersCount] = useState(0);
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [ticketType, setTicketType] = useState("transaction");
@@ -58,95 +59,121 @@ export default function MyTicketsPage() {
   const [filteredTickets, setFilteredTickets] = useState([]);
   const [selectedTicket, setSelectedTicket] = useState(null);
 
-  // Memuat data pengguna dan pesanan setelah halaman tampil.
   useEffect(() => {
-    try {
-      const savedUser = localStorage.getItem("encoreCurrentUser");
+    const fetchUserTickets = async () => {
+      try {
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
 
-      if (!savedUser) {
-        router.replace("/login");
-        return;
+        if (!authUser) {
+          router.replace("/login");
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", authUser.id)
+          .single();
+
+        if (!profile || profile.role !== "buyer") {
+          router.replace("/login");
+          return;
+        }
+
+        setUser({ ...profile, email: profile.email || authUser.email });
+
+        const { data: ordersData, error } = await supabase
+          .from("orders")
+          .select(`
+            *,
+            tickets (
+              *,
+              events ( * ),
+              ticket_types ( * )
+            )
+          `)
+          .eq("buyer_id", authUser.id)
+          .eq("payment_status", "paid")
+          .order("created_at", { ascending: false });
+
+        if (error) {
+          console.error("Gagal memuat tiket dari Supabase:", error);
+          setTickets([]);
+          setOrdersCount(0);
+          return;
+        }
+
+        const paidOrders = ordersData || [];
+        setOrdersCount(paidOrders.length);
+
+        // Ratakan setiap baris tiket dari masing-masing order
+        const flattenedTickets = paidOrders.flatMap((order) => {
+          const orderTickets = Array.isArray(order.tickets) ? order.tickets : [];
+
+          if (orderTickets.length === 0) {
+            return [
+              {
+                id: order.id,
+                orderId: order.id,
+                ticketCode: `ENC-${String(order.id).slice(0, 8).toUpperCase()}`,
+                checkedIn: false,
+                holderName: order.buyer_name,
+                buyerName: order.buyer_name,
+                buyerEmail: order.buyer_email,
+                buyerPhone: order.buyer_phone,
+                paymentMethod: order.payment_method,
+                total: order.total,
+                ticketName: "-",
+                ticketPrice: order.subtotal,
+                quantity: 1,
+                eventTitle: "Konser ENCORE",
+                eventArtist: "Live Music Event",
+                eventImage: "",
+                eventDate: "-",
+                eventLocation: "-",
+              },
+            ];
+          }
+
+          return orderTickets.map((t) => {
+            const ev = t.events || {};
+            const tt = t.ticket_types || {};
+
+            return {
+              id: t.id,
+              orderId: order.id,
+              ticketCode: t.ticket_code || `ENC-${String(t.id).slice(0, 8).toUpperCase()}`,
+              checkedIn: Boolean(t.checked_in),
+              holderName: t.holder_name || order.buyer_name,
+              buyerName: order.buyer_name,
+              buyerEmail: order.buyer_email,
+              buyerPhone: order.buyer_phone,
+              paymentMethod: order.payment_method,
+              total: order.total,
+              ticketName: tt.name || "-",
+              ticketPrice: tt.price ?? order.subtotal,
+              quantity: 1,
+              eventTitle: ev.title || "Konser ENCORE",
+              eventArtist: ev.artist || ev.lineup || "Live Music Event",
+              eventImage: ev.image_url || ev.image || "",
+              eventDate: ev.event_date || ev.date || "-",
+              eventLocation: ev.location || ev.venue || "-",
+            };
+          });
+        });
+
+        setTickets(flattenedTickets);
+      } catch (err) {
+        console.error("Gagal memuat tiket:", err);
+      } finally {
+        setLoading(false);
       }
-
-      const currentUser = JSON.parse(savedUser);
-
-      if (currentUser.role !== "buyer") {
-        router.replace("/login");
-        return;
-      }
-
-      setUser(currentUser);
-
-      const savedOrders = JSON.parse(
-        localStorage.getItem("encoreOrders") || "[]"
-      );
-
-      const userTickets = savedOrders.filter((order) => {
-        const paid = ["paid", "success", "settlement"].includes(
-          String(order.status || order.paymentStatus || "").toLowerCase()
-        );
-
-        const belongsToUser =
-          String(order.userId) === String(currentUser.id) ||
-          order.buyerEmail === currentUser.email;
-
-        return paid && belongsToUser;
-      });
-
-      setTickets(userTickets);
-    } catch (error) {
-      console.error("Gagal memuat tiket:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [router]);
-
-  function getConcert(order) {
-    return concerts.find(
-      (concert) => String(concert.id) === String(order.concertId)
-    );
-  }
-
-  function getTicketCode(order) {
-    return order.ticketCode || `ENCORE-${order.id || "TICKET"}`;
-  }
-
-  function getQuantity(order) {
-    return Number(
-      order.ticketQuantity ?? order.quantity ?? order.totalPersons ?? 1
-    );
-  }
-
-  function getTicketInfo(order) {
-    const concert = getConcert(order);
-
-    return {
-      title:
-        concert?.title ||
-        order.concertTitle ||
-        order.eventName ||
-        "Konser ENCORE",
-      artist: concert?.artist || order.artist || "Live Music Event",
-      image: concert?.image || order.concertImage || "",
-      date: concert?.date || order.concertDate || "-",
-      location:
-        concert?.location ||
-        concert?.venue ||
-        order.concertLocation ||
-        order.location ||
-        "-",
     };
-  }
 
-  function getStatus(order) {
-    return order.checkInStatus === "checked_in"
-      ? "Sudah Check-in"
-      : "Belum Check-in";
-  }
-
-  function getTotal(order) {
-    return Number(order.total || order.totalPrice || order.totalAmount || 0);
-  }
+    fetchUserTickets();
+  }, [router]);
 
   function formatPrice(value) {
     return `Rp${Number(value || 0).toLocaleString("id-ID")}`;
@@ -161,8 +188,8 @@ export default function MyTicketsPage() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const result = tickets.filter((order) => {
-      const date = parseConcertDate(getTicketInfo(order).date);
+    const result = tickets.filter((item) => {
+      const date = parseConcertDate(item.eventDate);
 
       if (!date) {
         return eventStatus === "upcoming";
@@ -176,13 +203,8 @@ export default function MyTicketsPage() {
     setFilteredTickets(result);
   }, [tickets, eventStatus]);
 
-  const totalTickets = tickets.reduce(
-    (total, order) => total + getQuantity(order),
-    0
-  );
-
-  function openTicket(order) {
-    setSelectedTicket(order);
+  function openTicket(item) {
+    setSelectedTicket(item);
   }
 
   function printTicket() {
@@ -231,14 +253,14 @@ export default function MyTicketsPage() {
           <div className="rounded-[13px] border border-[#382a49] bg-[#21172e] p-[18px]">
             <span className="block text-xs text-[#b9abc9]">Total Pesanan</span>
             <strong className="mt-2 block text-[25px] text-[#c69bff]">
-              {tickets.length}
+              {ordersCount}
             </strong>
           </div>
 
           <div className="rounded-[13px] border border-[#382a49] bg-[#21172e] p-[18px]">
             <span className="block text-xs text-[#b9abc9]">Total Tiket</span>
             <strong className="mt-2 block text-[25px] text-[#c69bff]">
-              {totalTickets}
+              {tickets.length}
             </strong>
           </div>
         </div>
@@ -325,22 +347,22 @@ export default function MyTicketsPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-[17px]">
-            {filteredTickets.map((order, index) => {
-              const info = getTicketInfo(order);
-              const code = getTicketCode(order);
-              const checkedIn = order.checkInStatus === "checked_in";
+            {filteredTickets.map((item, index) => {
+              const statusText = item.checkedIn
+                ? "Sudah Check-in"
+                : "Belum Check-in";
 
               return (
                 <article
                   className="grid grid-cols-[minmax(0,1fr)_190px] overflow-hidden rounded-[14px] border border-[#382a49] bg-[#21172e] max-[700px]:grid-cols-1"
-                  key={`${order.id || code}-${index}`}
+                  key={`${item.id}-${index}`}
                 >
                   <div className="flex min-w-0 gap-[18px] p-[19px] max-[700px]:flex-col">
                     <div className="grid h-[165px] w-[125px] shrink-0 place-items-center overflow-hidden rounded-[9px] bg-[#302340] text-[40px] text-[#c69bff] max-[700px]:h-[180px] max-[700px]:w-full">
-                      {info.image ? (
+                      {item.eventImage ? (
                         <img
-                          src={info.image}
-                          alt={info.title}
+                          src={item.eventImage}
+                          alt={item.eventTitle}
                           className="size-full object-cover"
                         />
                       ) : (
@@ -356,21 +378,21 @@ export default function MyTicketsPage() {
 
                         <span
                           className={`rounded-[20px] px-[9px] py-1.5 text-[10px] font-bold ${
-                            checkedIn
+                            item.checkedIn
                               ? "bg-[#244534] text-[#a4edc0]"
                               : "bg-[#50391d] text-[#ffd38c]"
                           }`}
                         >
-                          {getStatus(order)}
+                          {statusText}
                         </span>
                       </div>
 
                       <h3 className="m-0 font-heading text-lg font-bold">
-                        {info.title}
+                        {item.eventTitle}
                       </h3>
 
                       <p className="mt-1.5 text-xs text-[#b9abc9]">
-                        {info.artist}
+                        {item.eventArtist}
                       </p>
 
                       <div className="my-[18px] grid grid-cols-2 gap-[15px]">
@@ -379,7 +401,7 @@ export default function MyTicketsPage() {
                             Tanggal
                           </span>
                           <strong className="block text-xs [overflow-wrap:anywhere]">
-                            {info.date}
+                            {item.eventDate}
                           </strong>
                         </div>
 
@@ -388,7 +410,7 @@ export default function MyTicketsPage() {
                             Lokasi
                           </span>
                           <strong className="block text-xs [overflow-wrap:anywhere]">
-                            {info.location}
+                            {item.eventLocation}
                           </strong>
                         </div>
 
@@ -397,16 +419,16 @@ export default function MyTicketsPage() {
                             Kategori Tiket
                           </span>
                           <strong className="block text-xs [overflow-wrap:anywhere]">
-                            {order.ticketName || "-"}
+                            {item.ticketName}
                           </strong>
                         </div>
 
                         <div>
                           <span className="mb-[5px] block text-[10px] text-[#a99ab7]">
-                            Jumlah Tiket
+                            Pemegang Tiket
                           </span>
                           <strong className="block text-xs [overflow-wrap:anywhere]">
-                            {getQuantity(order)} tiket
+                            {item.holderName || "-"}
                           </strong>
                         </div>
                       </div>
@@ -416,13 +438,13 @@ export default function MyTicketsPage() {
                           KODE E-TIKET
                         </span>
                         <strong className="block text-xs [overflow-wrap:anywhere] text-[#d0a4ff]">
-                          {code}
+                          {item.ticketCode}
                         </strong>
                       </div>
 
                       <button
                         type="button"
-                        onClick={() => openTicket(order)}
+                        onClick={() => openTicket(item)}
                         className="mt-[13px] cursor-pointer rounded-lg border border-[#8051b5] bg-[#39224f] px-[13px] py-2.5 text-xs text-white transition hover:bg-[#4c2d69]"
                       >
                         Lihat Detail E-Ticket →
@@ -433,7 +455,7 @@ export default function MyTicketsPage() {
                   <div className="flex flex-col items-center justify-center border-l border-dashed border-[#59436f] p-[15px] text-center max-[700px]:border-t max-[700px]:border-l-0">
                     <div className="rounded-lg bg-white p-2">
                       <QRCodeCanvas
-                        value={code}
+                        value={item.ticketCode}
                         size={135}
                         level="H"
                         includeMargin
@@ -482,150 +504,138 @@ export default function MyTicketsPage() {
               </button>
             </div>
 
-            {(() => {
-              const info = getTicketInfo(selectedTicket);
-              const code = getTicketCode(selectedTicket);
+            <div className="relative flex min-h-[190px] items-end overflow-hidden rounded-[10px] bg-[#302340]">
+              {selectedTicket.eventImage && (
+                <img
+                  src={selectedTicket.eventImage}
+                  alt={selectedTicket.eventTitle}
+                  className="absolute inset-0 size-full object-cover opacity-40"
+                />
+              )}
 
-              return (
-                <>
-                  <div className="relative flex min-h-[190px] items-end overflow-hidden rounded-[10px] bg-[#302340]">
-                    {info.image && (
-                      <img
-                        src={info.image}
-                        alt={info.title}
-                        className="absolute inset-0 size-full object-cover opacity-40"
-                      />
-                    )}
+              <div className="relative p-[22px]">
+                <span className="text-[10px] tracking-[2px] text-[#d4b5ff]">
+                  LIVE MUSIC EXPERIENCE
+                </span>
+                <h2 className="mt-1 font-heading text-xl font-bold">
+                  {selectedTicket.eventTitle}
+                </h2>
+                <p className="text-sm text-[#e2d8f0]">
+                  {selectedTicket.eventArtist}
+                </p>
+              </div>
+            </div>
 
-                    <div className="relative p-[22px]">
-                      <span className="text-[10px] tracking-[2px] text-[#d4b5ff]">
-                        LIVE MUSIC EXPERIENCE
-                      </span>
-                      <h2 className="mt-1 font-heading text-xl font-bold">
-                        {info.title}
-                      </h2>
-                      <p className="text-sm text-[#e2d8f0]">{info.artist}</p>
-                    </div>
-                  </div>
+            <div className="grid grid-cols-2 gap-[18px] py-[23px]">
+              <div>
+                <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                  Nama Pemesan
+                </span>
+                <strong className="block text-xs [overflow-wrap:anywhere]">
+                  {selectedTicket.buyerName || user.full_name || user.name || "-"}
+                </strong>
+              </div>
 
-                  <div className="grid grid-cols-2 gap-[18px] py-[23px]">
-                    <div>
-                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
-                        Nama Pemesan
-                      </span>
-                      <strong className="block text-xs [overflow-wrap:anywhere]">
-                        {selectedTicket.buyerName || user.name || "-"}
-                      </strong>
-                    </div>
+              <div>
+                <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                  Email
+                </span>
+                <strong className="block text-xs [overflow-wrap:anywhere]">
+                  {selectedTicket.buyerEmail || user.email || "-"}
+                </strong>
+              </div>
 
-                    <div>
-                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
-                        Email
-                      </span>
-                      <strong className="block text-xs [overflow-wrap:anywhere]">
-                        {selectedTicket.buyerEmail || user.email || "-"}
-                      </strong>
-                    </div>
+              <div>
+                <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                  Nomor HP
+                </span>
+                <strong className="block text-xs [overflow-wrap:anywhere]">
+                  {selectedTicket.buyerPhone || "-"}
+                </strong>
+              </div>
 
-                    <div>
-                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
-                        Nomor HP
-                      </span>
-                      <strong className="block text-xs [overflow-wrap:anywhere]">
-                        {selectedTicket.buyerPhone || "-"}
-                      </strong>
-                    </div>
+              <div>
+                <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                  Tanggal Konser
+                </span>
+                <strong className="block text-xs [overflow-wrap:anywhere]">
+                  {selectedTicket.eventDate}
+                </strong>
+              </div>
 
-                    <div>
-                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
-                        Tanggal Konser
-                      </span>
-                      <strong className="block text-xs [overflow-wrap:anywhere]">
-                        {info.date}
-                      </strong>
-                    </div>
+              <div>
+                <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                  Lokasi
+                </span>
+                <strong className="block text-xs [overflow-wrap:anywhere]">
+                  {selectedTicket.eventLocation}
+                </strong>
+              </div>
 
-                    <div>
-                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
-                        Lokasi
-                      </span>
-                      <strong className="block text-xs [overflow-wrap:anywhere]">
-                        {info.location}
-                      </strong>
-                    </div>
+              <div>
+                <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                  Kategori Tiket
+                </span>
+                <strong className="block text-xs [overflow-wrap:anywhere]">
+                  {selectedTicket.ticketName}
+                </strong>
+              </div>
 
-                    <div>
-                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
-                        Kategori Tiket
-                      </span>
-                      <strong className="block text-xs [overflow-wrap:anywhere]">
-                        {selectedTicket.ticketName || "-"}
-                      </strong>
-                    </div>
+              <div>
+                <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                  Harga Tiket
+                </span>
+                <strong className="block text-xs [overflow-wrap:anywhere]">
+                  {formatPrice(selectedTicket.ticketPrice)}
+                </strong>
+              </div>
 
-                    <div>
-                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
-                        Jumlah Tiket
-                      </span>
-                      <strong className="block text-xs [overflow-wrap:anywhere]">
-                        {getQuantity(selectedTicket)} tiket
-                      </strong>
-                    </div>
+              <div>
+                <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                  Total Pembayaran
+                </span>
+                <strong className="block text-xs [overflow-wrap:anywhere]">
+                  {formatPrice(selectedTicket.total)}
+                </strong>
+              </div>
 
-                    <div>
-                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
-                        Harga Tiket
-                      </span>
-                      <strong className="block text-xs [overflow-wrap:anywhere]">
-                        {formatPrice(selectedTicket.ticketPrice)}
-                      </strong>
-                    </div>
+              <div>
+                <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                  Metode Pembayaran
+                </span>
+                <strong className="block text-xs [overflow-wrap:anywhere]">
+                  {selectedTicket.paymentMethod || "-"}
+                </strong>
+              </div>
 
-                    <div>
-                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
-                        Total Pembayaran
-                      </span>
-                      <strong className="block text-xs [overflow-wrap:anywhere]">
-                        {formatPrice(getTotal(selectedTicket))}
-                      </strong>
-                    </div>
+              <div>
+                <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
+                  Status Check-in
+                </span>
+                <strong className="block text-xs [overflow-wrap:anywhere]">
+                  {selectedTicket.checkedIn
+                    ? "Sudah Check-in"
+                    : "Belum Check-in"}
+                </strong>
+              </div>
+            </div>
 
-                    <div>
-                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
-                        Metode Pembayaran
-                      </span>
-                      <strong className="block text-xs [overflow-wrap:anywhere]">
-                        {selectedTicket.paymentMethod || "-"}
-                      </strong>
-                    </div>
+            <div className="flex flex-col items-center gap-2.5 rounded-[10px] bg-white p-5 text-center text-[#24162f]">
+              <QRCodeCanvas
+                value={selectedTicket.ticketCode}
+                size={180}
+                level="H"
+                includeMargin
+              />
 
-                    <div>
-                      <span className="mb-1.5 block text-[10px] text-[#a99ab7]">
-                        Status Check-in
-                      </span>
-                      <strong className="block text-xs [overflow-wrap:anywhere]">
-                        {getStatus(selectedTicket)}
-                      </strong>
-                    </div>
-                  </div>
+              <strong className="[overflow-wrap:anywhere]">
+                {selectedTicket.ticketCode}
+              </strong>
 
-                  <div className="flex flex-col items-center gap-2.5 rounded-[10px] bg-white p-5 text-center text-[#24162f]">
-                    <QRCodeCanvas
-                      value={code}
-                      size={180}
-                      level="H"
-                      includeMargin
-                    />
-
-                    <strong className="[overflow-wrap:anywhere]">{code}</strong>
-
-                    <p className="text-[11px]">
-                      Tunjukkan QR Code ini kepada petugas konser.
-                    </p>
-                  </div>
-                </>
-              );
-            })()}
+              <p className="text-[11px]">
+                Tunjukkan QR Code ini kepada petugas konser.
+              </p>
+            </div>
 
             <div className="mt-[18px] flex justify-end gap-2.5 max-[700px]:flex-col print:hidden">
               <button

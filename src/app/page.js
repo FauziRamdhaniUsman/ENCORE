@@ -1,17 +1,33 @@
+
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { concerts, formatPrice } from "../data/concerts";
+import {
+  concerts as staticConcerts,
+  formatPrice,
+} from "../data/concerts";
+import { supabase } from "../lib/supabase";
 
 const imageExtensions = ["jpg", "jpeg", "png", "webp"];
 
-function LocalPhoto({ name, alt, className = "", loading = "lazy" }) {
+function LocalPhoto({
+  name,
+  alt,
+  className = "",
+  loading = "lazy",
+}) {
   const [extensionIndex, setExtensionIndex] = useState(0);
   const [failed, setFailed] = useState(false);
 
   if (failed) {
-    return <div className="eh-photo-fallback" role="img" aria-label={alt} />;
+    return (
+      <div
+        className="eh-photo-fallback"
+        role="img"
+        aria-label={alt}
+      />
+    );
   }
 
   return (
@@ -65,10 +81,13 @@ const artists = [
   { name: "Olivia Rodrigo", photo: "artis 5" },
 ];
 
-const galleryPreview = Array.from({ length: 9 }, (_, index) => ({
-  name: `galeri ${index + 1}`,
-  title: `Concert Gallery ${index + 1}`,
-}));
+const galleryPreview = Array.from(
+  { length: 9 },
+  (_, index) => ({
+    name: `galeri ${index + 1}`,
+    title: `Concert Gallery ${index + 1}`,
+  })
+);
 
 const galleryRows = [
   galleryPreview,
@@ -185,6 +204,108 @@ const faqs = [
   },
 ];
 
+const hiddenStatuses = [
+  "draft",
+  "pending",
+  "rejected",
+  "cancelled",
+  "archived",
+];
+
+const isoPattern = /^\d{4}-\d{2}-\d{2}/;
+
+const pick = (source, keys, fallback = "") => {
+  for (const key of keys) {
+    const value = source[key];
+
+    if (
+      value !== undefined &&
+      value !== null &&
+      value !== ""
+    ) {
+      return value;
+    }
+  }
+
+  return fallback;
+};
+
+const normalizeConcert = (raw) => {
+  const rawDate = pick(raw, [
+    "date_iso",
+    "dateISO",
+    "event_date",
+    "start_date",
+    "start_at",
+    "date",
+  ]);
+
+  const dateISO =
+    typeof rawDate === "string" &&
+    isoPattern.test(rawDate)
+      ? rawDate.slice(0, 10)
+      : "";
+
+  const formattedDate = dateISO
+    ? new Date(`${dateISO}T00:00:00`).toLocaleDateString(
+        "id-ID",
+        {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        }
+      )
+    : "";
+
+  const textDate =
+    typeof raw.date === "string" &&
+    !isoPattern.test(raw.date)
+      ? raw.date
+      : "";
+
+  const ticketPrices = Array.isArray(raw.ticket_types)
+    ? raw.ticket_types
+        .map((ticket) => Number(ticket.price))
+        .filter(
+          (value) =>
+            Number.isFinite(value) && value > 0
+        )
+    : [];
+
+  const basePrice =
+    Number(
+      pick(
+        raw,
+        ["min_price", "price", "base_price"],
+        0
+      )
+    ) || 0;
+
+  return {
+    id: raw.id,
+    title: pick(raw, ["title", "name"], "Tanpa judul"),
+    subtitle: pick(raw, ["subtitle"]),
+    artist: pick(raw, ["artist", "performer"]),
+    image: pick(raw, [
+      "image",
+      "image_url",
+      "poster_url",
+      "poster",
+      "banner_url",
+    ]),
+    dateISO,
+    date: textDate || formattedDate,
+    venue: pick(raw, ["venue", "location_name"]),
+    city: pick(raw, ["city", "location", "kota"]),
+    price: ticketPrices.length
+      ? Math.min(...ticketPrices)
+      : basePrice,
+  };
+};
+
+const toTime = (iso) =>
+  new Date(`${iso}T00:00:00`).getTime();
+
 function BenefitIcon({ type }) {
   const common = {
     width: 28,
@@ -259,7 +380,13 @@ function StepIcon({ type }) {
   if (type === "payment") {
     return (
       <svg {...common}>
-        <rect x="2.5" y="5" width="19" height="14" rx="2" />
+        <rect
+          x="2.5"
+          y="5"
+          width="19"
+          height="14"
+          rx="2"
+        />
         <path d="M2.5 10h19" />
         <path d="M7 15h3" />
       </svg>
@@ -297,6 +424,7 @@ export default function Home() {
   const testimonialRef = useRef(null);
   const testimonialTouchX = useRef(null);
 
+  const [concerts, setConcerts] = useState([]);
   const [heroIndex, setHeroIndex] = useState(0);
 
   const [sliderEdge, setSliderEdge] = useState({
@@ -304,41 +432,134 @@ export default function Home() {
     end: false,
   });
 
-  const [testimonialIndex, setTestimonialIndex] = useState(testimonials.length);
-  const [testimonialStep, setTestimonialStep] = useState(0);
-  const [testimonialAnimating, setTestimonialAnimating] = useState(false);
+  const [testimonialIndex, setTestimonialIndex] =
+    useState(testimonials.length);
 
-  const recommendedConcerts = concerts.slice(0, 6);
+  const [testimonialStep, setTestimonialStep] =
+    useState(0);
 
-  const upcomingConcerts = [...concerts]
-    .sort((a, b) => {
-      const da = Date.parse(a.date);
-      const db = Date.parse(b.date);
+  const [testimonialAnimating, setTestimonialAnimating] =
+    useState(false);
 
-      if (Number.isNaN(da) && Number.isNaN(db)) return 0;
-      if (Number.isNaN(da)) return 1;
-      if (Number.isNaN(db)) return -1;
+  // FIX NEXT.JS 16:
+  // Tanggal hari ini dihitung setelah komponen
+  // berjalan di browser, bukan ketika prerender.
+  const [todayISO, setTodayISO] = useState(null);
 
-      return da - db;
-    })
+  useEffect(() => {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Jakarta",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+
+    const values = Object.fromEntries(
+      parts.map((part) => [part.type, part.value])
+    );
+
+    setTodayISO(
+      `${values.year}-${values.month}-${values.day}`
+    );
+  }, []);
+
+  // MENGAMBIL DATA KONSER DARI SUPABASE
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadConcerts = async () => {
+      try {
+        let result = await supabase
+          .from("events")
+          .select("*, ticket_types(*)");
+
+        if (result.error) {
+          result = await supabase
+            .from("events")
+            .select("*");
+        }
+
+        const rows =
+          !result.error && Array.isArray(result.data)
+            ? result.data
+            : [];
+
+        const source =
+          rows.length > 0 ? rows : staticConcerts;
+
+        const list = source
+          .filter(
+            (row) =>
+              !hiddenStatuses.includes(
+                String(row.status || "").toLowerCase()
+              )
+          )
+          .map(normalizeConcert);
+
+        if (!cancelled) {
+          setConcerts(list);
+        }
+      } catch (error) {
+        console.error(
+          "Gagal mengambil konser untuk Homepage:",
+          error
+        );
+
+        if (!cancelled) {
+          setConcerts([]);
+        }
+      }
+    };
+
+    loadConcerts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // FILTER KONSER BERDASARKAN TANGGAL INDONESIA
+  const activeConcerts = concerts.filter(
+    (concert) =>
+      todayISO !== null &&
+      Boolean(concert.dateISO) &&
+      concert.dateISO >= todayISO
+  );
+
+  const recommendedConcerts =
+    activeConcerts.slice(0, 6);
+
+  const upcomingConcerts = [...activeConcerts]
+    .sort(
+      (a, b) =>
+        toTime(a.dateISO) - toTime(b.dateISO)
+    )
     .slice(0, 4);
 
   const cityCards = cities.map((name) => ({
     name,
-    count: concerts.filter((concert) =>
-      (concert.city || concert.location || "")
+    count: activeConcerts.filter((concert) =>
+      (concert.city || "")
         .toLowerCase()
         .includes(name.toLowerCase())
     ).length,
   }));
 
+  // HERO SLIDER
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (
+      window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches
+    ) {
       return;
     }
 
     const timer = setInterval(() => {
-      setHeroIndex((current) => (current + 1) % heroPhotos.length);
+      setHeroIndex(
+        (current) =>
+          (current + 1) % heroPhotos.length
+      );
     }, 6000);
 
     return () => clearInterval(timer);
@@ -347,12 +568,15 @@ export default function Home() {
   const changeHero = (direction) => {
     setHeroIndex(
       (current) =>
-        (current + direction + heroPhotos.length) % heroPhotos.length
+        (current + direction + heroPhotos.length) %
+        heroPhotos.length
     );
   };
 
+  // RECOMMENDATION SLIDER
   const updateSliderEdge = () => {
     const slider = sliderRef.current;
+
     if (!slider) return;
 
     setSliderEdge({
@@ -365,15 +589,23 @@ export default function Home() {
 
   useEffect(() => {
     updateSliderEdge();
-    window.addEventListener("resize", updateSliderEdge);
+
+    window.addEventListener(
+      "resize",
+      updateSliderEdge
+    );
 
     return () => {
-      window.removeEventListener("resize", updateSliderEdge);
+      window.removeEventListener(
+        "resize",
+        updateSliderEdge
+      );
     };
-  }, []);
+  }, [concerts, todayISO]);
 
   const slideConcerts = (direction) => {
     const slider = sliderRef.current;
+
     if (!slider) return;
 
     slider.scrollBy({
@@ -382,46 +614,79 @@ export default function Home() {
     });
   };
 
+  // ENCORE EXPERIENCE SLIDER
   useEffect(() => {
     const viewport = testimonialRef.current;
+
     if (!viewport) return;
 
     const measure = () => {
-      const card = viewport.querySelector(".eh-testimonial");
-      const track = viewport.querySelector(".eh-testimonials-track");
+      const card = viewport.querySelector(
+        ".eh-testimonial"
+      );
+
+      const track = viewport.querySelector(
+        ".eh-testimonials-track"
+      );
+
       if (!card || !track) return;
 
       const gap =
-        parseFloat(window.getComputedStyle(track).columnGap) || 18;
+        parseFloat(
+          window.getComputedStyle(track).columnGap
+        ) || 18;
 
-      setTestimonialStep(card.getBoundingClientRect().width + gap);
+      setTestimonialStep(
+        card.getBoundingClientRect().width + gap
+      );
     };
 
     measure();
 
     const observer = new ResizeObserver(measure);
+
     observer.observe(viewport);
 
     return () => observer.disconnect();
   }, []);
 
   const slideTestimonials = (direction) => {
-    if (testimonialAnimating || !testimonialStep) return;
+    if (
+      testimonialAnimating ||
+      !testimonialStep
+    ) {
+      return;
+    }
 
     setTestimonialAnimating(true);
-    setTestimonialIndex((current) => current + direction);
+
+    setTestimonialIndex(
+      (current) => current + direction
+    );
   };
 
   const handleTestimonialTransitionEnd = (event) => {
-    if (event.propertyName !== "transform") return;
+    if (
+      event.propertyName !== "transform" ||
+      event.target !== event.currentTarget
+    ) {
+      return;
+    }
 
-    if (testimonialIndex < testimonials.length) {
+    if (
+      testimonialIndex < testimonials.length
+    ) {
       setTestimonialIndex(
-        (current) => current + testimonials.length
+        (current) =>
+          current + testimonials.length
       );
-    } else if (testimonialIndex >= testimonials.length * 2) {
+    } else if (
+      testimonialIndex >=
+      testimonials.length * 2
+    ) {
       setTestimonialIndex(
-        (current) => current - testimonials.length
+        (current) =>
+          current - testimonials.length
       );
     }
 
@@ -430,12 +695,16 @@ export default function Home() {
 
   const handleTestimonialTouchEnd = (event) => {
     const startX = testimonialTouchX.current;
+
     if (startX === null) return;
 
-    const distance = event.changedTouches[0].clientX - startX;
+    const distance =
+      event.changedTouches[0].clientX - startX;
 
     if (Math.abs(distance) > 45) {
-      slideTestimonials(distance < 0 ? 1 : -1);
+      slideTestimonials(
+        distance < 0 ? 1 : -1
+      );
     }
 
     testimonialTouchX.current = null;
@@ -447,8 +716,15 @@ export default function Home() {
         ENCORE, tiket konser dan festival musik
       </h1>
 
-      <section className="eh-hero" aria-label="Foto konser">
-        <div className="eh-hero-photo" key={heroIndex}>
+      {/* HERO SLIDER */}
+      <section
+        className="eh-hero"
+        aria-label="Foto konser"
+      >
+        <div
+          className="eh-hero-photo"
+          key={heroIndex}
+        >
           <LocalPhoto
             name={heroPhotos[heroIndex]}
             alt={`Suasana konser ${heroIndex + 1}`}
@@ -482,7 +758,9 @@ export default function Home() {
               type="button"
               key={photo}
               onClick={() => setHeroIndex(index)}
-              className={index === heroIndex ? "active" : ""}
+              className={
+                index === heroIndex ? "active" : ""
+              }
               aria-label={`Tampilkan foto ${index + 1}`}
               aria-pressed={index === heroIndex}
             />
@@ -491,8 +769,12 @@ export default function Home() {
       </section>
 
       <div className="eh-page">
+        {/* RECOMMENDATION */}
         {recommendedConcerts.length > 0 && (
-          <section className="eh-section" id="featured-concerts">
+          <section
+            className="eh-section"
+            id="featured-concerts"
+          >
             <div className="eh-section-head">
               <div>
                 <h2>Recommendation</h2>
@@ -501,7 +783,9 @@ export default function Home() {
               <div className="eh-slider-controls">
                 <button
                   type="button"
-                  onClick={() => slideConcerts(-1)}
+                  onClick={() =>
+                    slideConcerts(-1)
+                  }
                   disabled={sliderEdge.start}
                   aria-label="Sebelumnya"
                 >
@@ -510,14 +794,19 @@ export default function Home() {
 
                 <button
                   type="button"
-                  onClick={() => slideConcerts(1)}
+                  onClick={() =>
+                    slideConcerts(1)
+                  }
                   disabled={sliderEdge.end}
                   aria-label="Berikutnya"
                 >
                   ›
                 </button>
 
-                <Link href="/concerts" className="eh-outline-button">
+                <Link
+                  href="/concerts"
+                  className="eh-outline-button"
+                >
                   View All
                 </Link>
               </div>
@@ -530,30 +819,35 @@ export default function Home() {
               tabIndex={0}
               aria-label="Daftar rekomendasi"
             >
-              {recommendedConcerts.map((concert) => (
-                <Link
-                  key={concert.id}
-                  href={`/concerts/${concert.id}`}
-                  className="eh-poster"
-                  aria-label={`Lihat detail ${concert.title}`}
-                >
-                  <img
-                    src={concert.image}
-                    alt={`Poster ${concert.title}`}
-                    loading="lazy"
-                  />
+              {recommendedConcerts.map(
+                (concert) => (
+                  <Link
+                    key={concert.id}
+                    href={`/concerts/${concert.id}`}
+                    className="eh-poster"
+                    aria-label={`Lihat detail ${concert.title}`}
+                  >
+                    {concert.image && (
+                      <img
+                        src={concert.image}
+                        alt={`Poster ${concert.title}`}
+                        loading="lazy"
+                      />
+                    )}
 
-                  <div className="eh-poster-shade" />
+                    <div className="eh-poster-shade" />
 
-                  <h3 className="eh-poster-title">
-                    {concert.title}
-                  </h3>
-                </Link>
-              ))}
+                    <h3 className="eh-poster-title">
+                      {concert.title}
+                    </h3>
+                  </Link>
+                )
+              )}
             </div>
           </section>
         )}
 
+        {/* TRENDING ARTISTS */}
         <section className="eh-section eh-section-tight">
           <div className="eh-section-head">
             <div>
@@ -565,11 +859,16 @@ export default function Home() {
             {artists.map((artist) => (
               <Link
                 key={artist.name}
-                href={`/concerts?q=${encodeURIComponent(artist.name)}`}
+                href={`/concerts?q=${encodeURIComponent(
+                  artist.name
+                )}`}
                 className="eh-artist"
               >
                 <div className="eh-artist-photo">
-                  <LocalPhoto name={artist.photo} alt={artist.name} />
+                  <LocalPhoto
+                    name={artist.photo}
+                    alt={artist.name}
+                  />
                 </div>
 
                 <span>{artist.name}</span>
@@ -578,6 +877,7 @@ export default function Home() {
           </div>
         </section>
 
+        {/* UPCOMING CONCERTS */}
         {upcomingConcerts.length > 0 && (
           <section className="eh-section eh-section-tight">
             <div className="eh-section-head">
@@ -585,52 +885,76 @@ export default function Home() {
                 <h2>Upcoming Concerts</h2>
               </div>
 
-              <Link href="/concerts" className="eh-outline-button">
+              <Link
+                href="/concerts"
+                className="eh-outline-button"
+              >
                 Lihat jadwal lengkap
               </Link>
             </div>
 
             <div className="eh-upcoming">
-              {upcomingConcerts.map((concert) => (
-                <Link
-                  key={concert.id}
-                  href={`/concerts/${concert.id}`}
-                  className="eh-up-row"
-                >
-                  <div className="eh-up-thumb">
-                    <img
-                      src={concert.image}
-                      alt={`Poster ${concert.title}`}
-                      loading="lazy"
-                    />
-                  </div>
-
-                  <div className="eh-up-info">
-                    <h3>{concert.title}</h3>
-                    <p>{concert.artist || concert.subtitle}</p>
-
-                    <span>
-                      ◷ {concert.date} &nbsp;&nbsp; ⌖{" "}
-                      {concert.venue || concert.location}
-                    </span>
-                  </div>
-
-                  <div className="eh-up-action">
-                    <div>
-                      <small>Mulai dari</small>
-                      <strong>{formatPrice(concert.price)}</strong>
+              {upcomingConcerts.map(
+                (concert) => (
+                  <Link
+                    key={concert.id}
+                    href={`/concerts/${concert.id}`}
+                    className="eh-up-row"
+                  >
+                    <div className="eh-up-thumb">
+                      {concert.image && (
+                        <img
+                          src={concert.image}
+                          alt={`Poster ${concert.title}`}
+                          loading="lazy"
+                        />
+                      )}
                     </div>
 
-                    <span className="eh-ticket-cta">
-                      Buy Ticket <span className="eh-ticket-arrow">›</span>
-                    </span>
-                  </div>
-                </Link>
-              ))}
+                    <div className="eh-up-info">
+                      <h3>{concert.title}</h3>
+
+                      <p>
+                        {concert.artist ||
+                          concert.subtitle}
+                      </p>
+
+                      <span>
+                        ◷ {concert.date}
+                        {"  "}⌖{" "}
+                        {concert.venue ||
+                          concert.city}
+                      </span>
+                    </div>
+
+                    <div className="eh-up-action">
+                      <div>
+                        <small>Mulai dari</small>
+
+                        <strong>
+                          {concert.price > 0
+                            ? formatPrice(
+                                concert.price
+                              )
+                            : "-"}
+                        </strong>
+                      </div>
+
+                      <span className="eh-ticket-cta">
+                        Buy Ticket
+                        <span className="eh-ticket-arrow">
+                          ›
+                        </span>
+                      </span>
+                    </div>
+                  </Link>
+                )
+              )}
             </div>
           </section>
         )}
 
+        {/* EXPLORE BY CITIES */}
         <section className="eh-section eh-section-tight">
           <div className="eh-section-head">
             <div>
@@ -642,7 +966,9 @@ export default function Home() {
             {cityCards.map((item) => (
               <Link
                 key={item.name}
-                href={`/concerts?city=${encodeURIComponent(item.name)}`}
+                href={`/concerts?city=${encodeURIComponent(
+                  item.name
+                )}`}
                 className="eh-photo-card eh-city"
               >
                 <LocalPhoto
@@ -654,6 +980,7 @@ export default function Home() {
 
                 <div className="eh-photo-card-text">
                   <strong>{item.name}</strong>
+
                   <span>
                     {item.count > 0
                       ? `${item.count} konser`
@@ -665,7 +992,11 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="eh-why" aria-labelledby="eh-why-title">
+        {/* WHY ENCORE */}
+        <section
+          className="eh-why"
+          aria-labelledby="eh-why-title"
+        >
           <div className="eh-why-content">
             <h2 id="eh-why-title">
               Every Concert
@@ -679,9 +1010,14 @@ export default function Home() {
 
             <div className="eh-benefits">
               {benefits.map((benefit) => (
-                <div className="eh-benefit" key={benefit.title}>
+                <div
+                  className="eh-benefit"
+                  key={benefit.title}
+                >
                   <div className="eh-benefit-icon">
-                    <BenefitIcon type={benefit.icon} />
+                    <BenefitIcon
+                      type={benefit.icon}
+                    />
                   </div>
 
                   <h3>{benefit.title}</h3>
@@ -692,12 +1028,16 @@ export default function Home() {
           </div>
         </section>
 
+        {/* HOW TO BUY TICKETS */}
         <section className="eh-section">
           <div className="eh-howto">
             <div className="eh-section-head">
               <h2>How to Buy Tickets</h2>
 
-              <Link href="/concerts" className="eh-purple-button">
+              <Link
+                href="/concerts"
+                className="eh-purple-button"
+              >
                 Mulai cari konser
               </Link>
             </div>
@@ -711,7 +1051,9 @@ export default function Home() {
                     </span>
 
                     <span className="eh-step-icon">
-                      <StepIcon type={step.icon} />
+                      <StepIcon
+                        type={step.icon}
+                      />
                     </span>
                   </div>
 
@@ -723,47 +1065,74 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="eh-gallery" aria-label="Galeri ENCORE">
-          <div className="eh-gallery-background" aria-hidden="true" />
-          <div className="eh-gallery-background-overlay" aria-hidden="true" />
+        {/* CONCERT GALLERY */}
+        <section
+          className="eh-gallery"
+          aria-label="Galeri ENCORE"
+        >
+          <div
+            className="eh-gallery-background"
+            aria-hidden="true"
+          />
+
+          <div
+            className="eh-gallery-background-overlay"
+            aria-hidden="true"
+          />
 
           <div className="eh-section-head eh-gallery-head">
             <h2>Concert Gallery</h2>
           </div>
 
           <div className="eh-marquee-wrap">
-            {galleryRows.map((row, rowIndex) => (
-              <div className="eh-marquee" key={rowIndex}>
+            {galleryRows.map(
+              (row, rowIndex) => (
                 <div
-                  className={`eh-marquee-track ${
-                    rowIndex === 1 ? "eh-reverse" : ""
-                  }`}
+                  className="eh-marquee"
+                  key={rowIndex}
                 >
-                  {[0, 1].map((copy) => (
-                    <div
-                      className="eh-marquee-group"
-                      key={copy}
-                      aria-hidden={copy === 1 ? "true" : undefined}
-                    >
-                      {row.map((photo) => (
-                        <div
-                          className="eh-marquee-item"
-                          key={`${copy}-${photo.name}`}
-                        >
-                          <LocalPhoto
-                            name={photo.name}
-                            alt={copy === 1 ? "" : photo.title}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  ))}
+                  <div
+                    className={`eh-marquee-track ${
+                      rowIndex === 1
+                        ? "eh-reverse"
+                        : ""
+                    }`}
+                  >
+                    {[0, 1].map((copy) => (
+                      <div
+                        className="eh-marquee-group"
+                        key={copy}
+                        aria-hidden={
+                          copy === 1
+                            ? "true"
+                            : undefined
+                        }
+                      >
+                        {row.map((photo) => (
+                          <div
+                            className="eh-marquee-item"
+                            key={`${copy}-${photo.name}`}
+                          >
+                            <LocalPhoto
+                              name={photo.name}
+                              alt={
+                                copy === 1
+                                  ? ""
+                                  : photo.title
+                              }
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            )}
           </div>
         </section>
 
+        {/* ENCORE EXPERIENCE */}
         <section className="eh-section">
           <div className="eh-section-head">
             <div>
@@ -775,7 +1144,9 @@ export default function Home() {
             <button
               type="button"
               className="eh-review-arrow eh-review-left"
-              onClick={() => slideTestimonials(-1)}
+              onClick={() =>
+                slideTestimonials(-1)
+              }
               aria-label="Ulasan sebelumnya"
             >
               ‹
@@ -786,9 +1157,12 @@ export default function Home() {
               ref={testimonialRef}
               aria-label="Ulasan pengguna"
               onTouchStart={(event) => {
-                testimonialTouchX.current = event.touches[0].clientX;
+                testimonialTouchX.current =
+                  event.touches[0].clientX;
               }}
-              onTouchEnd={handleTestimonialTouchEnd}
+              onTouchEnd={
+                handleTestimonialTouchEnd
+              }
               onTouchCancel={() => {
                 testimonialTouchX.current = null;
               }}
@@ -797,41 +1171,59 @@ export default function Home() {
                 className="eh-testimonials-track"
                 style={{
                   transform: `translate3d(-${
-                    testimonialIndex * testimonialStep
+                    testimonialIndex *
+                    testimonialStep
                   }px, 0, 0)`,
-                  transition: testimonialAnimating
-                    ? "transform 420ms cubic-bezier(0.22, 1, 0.36, 1)"
-                    : "none",
-                  visibility: testimonialStep ? "visible" : "hidden",
+                  transition:
+                    testimonialAnimating
+                      ? "transform 420ms cubic-bezier(0.22, 1, 0.36, 1)"
+                      : "none",
+                  visibility: testimonialStep
+                    ? "visible"
+                    : "hidden",
                 }}
-                onTransitionEnd={handleTestimonialTransitionEnd}
+                onTransitionEnd={
+                  handleTestimonialTransitionEnd
+                }
               >
-                {[0, 1, 2].flatMap((copy) =>
-                  testimonials.map((item) => (
-                    <figure
-                      className="eh-testimonial"
-                      key={`${copy}-${item.name}`}
-                      aria-hidden={copy !== 1}
-                    >
-                      <figcaption className="eh-review-person">
-                        <ReviewAvatar />
-
-                        <span className="eh-review-person-info">
-                          <strong>{item.name}</strong>
-                          <span>{item.city}</span>
-                        </span>
-                      </figcaption>
-
-                      <div
-                        className="eh-stars"
-                        aria-label={`${item.rating} dari 5 bintang`}
+                {[0, 1, 2].flatMap(
+                  (copy) =>
+                    testimonials.map((item) => (
+                      <figure
+                        className="eh-testimonial"
+                        key={`${copy}-${item.name}`}
+                        aria-hidden={
+                          copy !== 1
+                        }
                       >
-                        {"★".repeat(item.rating)}
-                      </div>
+                        <figcaption className="eh-review-person">
+                          <ReviewAvatar />
 
-                      <blockquote>{item.text}</blockquote>
-                    </figure>
-                  ))
+                          <span className="eh-review-person-info">
+                            <strong>
+                              {item.name}
+                            </strong>
+
+                            <span>
+                              {item.city}
+                            </span>
+                          </span>
+                        </figcaption>
+
+                        <div
+                          className="eh-stars"
+                          aria-label={`${item.rating} dari 5 bintang`}
+                        >
+                          {"★".repeat(
+                            item.rating
+                          )}
+                        </div>
+
+                        <blockquote>
+                          {item.text}
+                        </blockquote>
+                      </figure>
+                    ))
                 )}
               </div>
             </div>
@@ -839,7 +1231,9 @@ export default function Home() {
             <button
               type="button"
               className="eh-review-arrow eh-review-right"
-              onClick={() => slideTestimonials(1)}
+              onClick={() =>
+                slideTestimonials(1)
+              }
               aria-label="Ulasan berikutnya"
             >
               ›
@@ -847,16 +1241,28 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="eh-section eh-section-tight" id="faq">
+        {/* FAQ */}
+        <section
+          className="eh-section eh-section-tight"
+          id="faq"
+        >
           <div className="eh-faq-wrap">
             <div className="eh-faq-head">
-              <h2>Frequently Asked Questions</h2>
+              <h2>
+                Frequently Asked Questions
+              </h2>
             </div>
 
             <div className="eh-faq">
               {faqs.map((item) => (
-                <details key={item.q} className="eh-faq-item">
-                  <summary>{item.q}</summary>
+                <details
+                  key={item.q}
+                  className="eh-faq-item"
+                >
+                  <summary>
+                    {item.q}
+                  </summary>
+
                   <p>{item.a}</p>
                 </details>
               ))}
@@ -865,6 +1271,7 @@ export default function Home() {
         </section>
       </div>
 
+      {/* STYLING HOMEPAGE ENCORE */}
       <style>{`
         .encore-home-2026 {
           --bg: #0a0716;
@@ -880,7 +1287,10 @@ export default function Home() {
           min-height: 100vh;
           background-color: var(--bg);
           background-image:
-            linear-gradient(rgba(10, 7, 22, .35), rgba(10, 7, 22, .55)),
+            linear-gradient(
+              rgba(10, 7, 22, .35),
+              rgba(10, 7, 22, .55)
+            ),
             url("/images/bg%20home.jpg");
           background-position: center center;
           background-size: 100% auto;
@@ -902,7 +1312,7 @@ export default function Home() {
         .encore-home-2026 h2,
         .encore-home-2026 h3 {
           margin: 0;
-          font-family: var(--font-outfit), sans-serif;
+          font-family: "Outfit", sans-serif;
         }
 
         .encore-home-2026 :focus-visible {
@@ -933,7 +1343,8 @@ export default function Home() {
           width: 100%;
           height: 100%;
           min-height: 100%;
-          background: linear-gradient(135deg, #2a1658, #14102b);
+          background:
+            linear-gradient(135deg, #2a1658, #14102b);
         }
 
         .eh-purple-button,
@@ -947,7 +1358,9 @@ export default function Home() {
           font-size: 14px;
           font-weight: 700;
           cursor: pointer;
-          transition: background .2s, border-color .2s;
+          transition:
+            background .2s,
+            border-color .2s;
         }
 
         .eh-purple-button {
@@ -1000,6 +1413,7 @@ export default function Home() {
           font-size: 14px;
         }
 
+        /* HERO */
         .eh-hero {
           position: relative;
           width: 100%;
@@ -1023,19 +1437,25 @@ export default function Home() {
         }
 
         @keyframes ehFade {
-          from { opacity: .4; }
-          to { opacity: 1; }
+          from {
+            opacity: .4;
+          }
+
+          to {
+            opacity: 1;
+          }
         }
 
         .eh-hero-shade {
           position: absolute;
           inset: 0;
           pointer-events: none;
-          background: linear-gradient(
-            0deg,
-            rgba(10,7,22,.9),
-            transparent 30%
-          );
+          background:
+            linear-gradient(
+              0deg,
+              rgba(10, 7, 22, .9),
+              transparent 30%
+            );
         }
 
         .eh-hero-arrow {
@@ -1061,8 +1481,13 @@ export default function Home() {
           color: var(--lilac);
         }
 
-        .eh-left { left: 24px; }
-        .eh-right { right: 24px; }
+        .eh-left {
+          left: 24px;
+        }
+
+        .eh-right {
+          right: 24px;
+        }
 
         .eh-hero-hairlines {
           position: absolute;
@@ -1089,6 +1514,7 @@ export default function Home() {
           background: var(--lilac);
         }
 
+        /* RECOMMENDATION */
         .eh-slider-controls {
           display: flex;
           align-items: center;
@@ -1107,7 +1533,9 @@ export default function Home() {
           font-size: 24px;
           line-height: 1;
           cursor: pointer;
-          transition: border-color .2s, background .2s;
+          transition:
+            border-color .2s,
+            background .2s;
         }
 
         .eh-slider-controls button:hover {
@@ -1147,12 +1575,17 @@ export default function Home() {
           aspect-ratio: 4 / 5;
           border-radius: 14px;
           background: #211735;
-          box-shadow: inset 0 0 0 1px var(--line);
-          transition: box-shadow .3s ease, transform .3s ease;
+          box-shadow:
+            inset 0 0 0 1px var(--line);
+          transition:
+            box-shadow .3s ease,
+            transform .3s ease;
         }
 
         .eh-poster:hover {
-          box-shadow: 0 12px 30px #0007, 0 0 0 1px var(--violet);
+          box-shadow:
+            0 12px 30px #0007,
+            0 0 0 1px var(--violet);
           transform: translateY(-5px);
         }
 
@@ -1175,11 +1608,12 @@ export default function Home() {
           position: absolute;
           z-index: -1;
           inset: 0;
-          background: linear-gradient(
-            0deg,
-            rgba(10,7,22,.9),
-            rgba(10,7,22,0) 45%
-          );
+          background:
+            linear-gradient(
+              0deg,
+              rgba(10, 7, 22, .9),
+              rgba(10, 7, 22, 0) 45%
+            );
         }
 
         .eh-poster-title {
@@ -1196,6 +1630,7 @@ export default function Home() {
           -webkit-box-orient: vertical;
         }
 
+        /* BUY TICKET */
         .eh-ticket-cta {
           position: relative;
           isolation: isolate;
@@ -1207,7 +1642,12 @@ export default function Home() {
           padding: 11px 17px;
           border: 1px solid #a78bfa70;
           border-radius: 9px;
-          background: linear-gradient(115deg, #8b5cf6, #7042d4);
+          background:
+            linear-gradient(
+              115deg,
+              #8b5cf6,
+              #7042d4
+            );
           color: #fff;
           font-size: 12px;
           font-weight: 800;
@@ -1227,12 +1667,13 @@ export default function Home() {
           left: -85%;
           width: 45%;
           height: 200%;
-          background: linear-gradient(
-            90deg,
-            transparent,
-            #ffffff75,
-            transparent
-          );
+          background:
+            linear-gradient(
+              90deg,
+              transparent,
+              #ffffff75,
+              transparent
+            );
           transform: skewX(-22deg);
           transition: left .55s ease;
         }
@@ -1242,9 +1683,16 @@ export default function Home() {
         }
 
         .eh-up-row:hover .eh-ticket-cta {
-          transform: translateY(-3px) scale(1.035);
-          box-shadow: 0 8px 23px #8b5cf660;
-          background: linear-gradient(115deg, #a78bfa, #7c3aed);
+          transform:
+            translateY(-3px) scale(1.035);
+          box-shadow:
+            0 8px 23px #8b5cf660;
+          background:
+            linear-gradient(
+              115deg,
+              #a78bfa,
+              #7c3aed
+            );
         }
 
         .eh-ticket-arrow {
@@ -1258,9 +1706,11 @@ export default function Home() {
           transform: translateX(4px);
         }
 
+        /* ARTISTS */
         .eh-artists {
           display: grid;
-          grid-template-columns: repeat(5, minmax(0, 1fr));
+          grid-template-columns:
+            repeat(5, minmax(0, 1fr));
           gap: 16px;
         }
 
@@ -1294,7 +1744,8 @@ export default function Home() {
         .eh-artist:hover .eh-artist-photo {
           border-color: var(--violet);
           transform: translateY(-4px);
-          box-shadow: 0 8px 22px #8b5cf640;
+          box-shadow:
+            0 8px 22px #8b5cf640;
         }
 
         .eh-artist:hover .eh-artist-photo img {
@@ -1309,6 +1760,7 @@ export default function Home() {
           line-height: 1.35;
         }
 
+        /* UPCOMING */
         .eh-upcoming {
           display: flex;
           flex-direction: column;
@@ -1317,7 +1769,8 @@ export default function Home() {
 
         .eh-up-row {
           display: grid;
-          grid-template-columns: 92px 1fr auto;
+          grid-template-columns:
+            92px 1fr auto;
           align-items: center;
           gap: 18px;
           padding: 12px 18px 12px 12px;
@@ -1333,7 +1786,8 @@ export default function Home() {
         .eh-up-row:hover {
           border-color: #8b5cf6a0;
           transform: translateY(-3px);
-          box-shadow: 0 10px 26px #0005;
+          box-shadow:
+            0 10px 26px #0005;
         }
 
         .eh-up-thumb {
@@ -1399,9 +1853,14 @@ export default function Home() {
           font-size: 17px;
         }
 
+        /* CITIES */
         .eh-cities {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+          grid-template-columns:
+            repeat(
+              auto-fit,
+              minmax(150px, 1fr)
+            );
           gap: 14px;
         }
 
@@ -1412,7 +1871,12 @@ export default function Home() {
           overflow: hidden;
           border: 1px solid var(--line);
           border-radius: 14px;
-          background: linear-gradient(135deg, #3b1f7a, #14102b);
+          background:
+            linear-gradient(
+              135deg,
+              #3b1f7a,
+              #14102b
+            );
           transition:
             border-color .25s,
             transform .3s,
@@ -1422,7 +1886,8 @@ export default function Home() {
         .eh-photo-card:hover {
           border-color: var(--violet);
           transform: translateY(-4px);
-          box-shadow: 0 10px 25px #0005;
+          box-shadow:
+            0 10px 25px #0005;
         }
 
         .eh-city {
@@ -1448,11 +1913,12 @@ export default function Home() {
           position: absolute;
           z-index: -1;
           inset: 0;
-          background: linear-gradient(
-            0deg,
-            rgba(10,7,22,.88),
-            rgba(10,7,22,.1) 60%
-          );
+          background:
+            linear-gradient(
+              0deg,
+              rgba(10, 7, 22, .88),
+              rgba(10, 7, 22, .1) 60%
+            );
         }
 
         .eh-photo-card-text {
@@ -1464,7 +1930,8 @@ export default function Home() {
 
         .eh-photo-card-text strong {
           display: block;
-          font-family: var(--font-outfit), sans-serif;
+          font-family:
+            "Outfit", sans-serif;
           font-size: 19px;
           font-weight: 700;
         }
@@ -1477,6 +1944,7 @@ export default function Home() {
           font-weight: 600;
         }
 
+        /* WHY ENCORE */
         .eh-why {
           position: relative;
           isolation: isolate;
@@ -1489,15 +1957,18 @@ export default function Home() {
 
         .eh-why-content {
           text-align: center;
-          animation: ehWhyEnter .8s ease both;
+          animation:
+            ehWhyEnter .8s ease both;
         }
 
         .eh-why-content h2 {
-          font-size: clamp(26px, 3.4vw, 40px);
+          font-size:
+            clamp(26px, 3.4vw, 40px);
           line-height: 1.12;
           font-weight: 800;
           letter-spacing: -1px;
-          text-shadow: 0 4px 24px #8b5cf630;
+          text-shadow:
+            0 4px 24px #8b5cf630;
         }
 
         .eh-why-tagline {
@@ -1511,6 +1982,7 @@ export default function Home() {
             opacity: 0;
             transform: translateY(15px);
           }
+
           to {
             opacity: 1;
             transform: translateY(0);
@@ -1519,7 +1991,11 @@ export default function Home() {
 
         .eh-benefits {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          grid-template-columns:
+            repeat(
+              auto-fit,
+              minmax(200px, 1fr)
+            );
           gap: 16px;
           margin-top: 32px;
         }
@@ -1530,7 +2006,8 @@ export default function Home() {
           padding: 22px 20px;
           border: 1px solid var(--line);
           border-radius: 16px;
-          background: rgba(21,16,39,.72);
+          background:
+            rgba(21, 16, 39, .72);
           backdrop-filter: blur(6px);
           text-align: left;
           transition:
@@ -1543,8 +2020,10 @@ export default function Home() {
         .eh-benefit:hover {
           transform: translateY(-6px);
           border-color: #8b5cf6a0;
-          background: rgba(39,25,68,.88);
-          box-shadow: 0 12px 28px #0005;
+          background:
+            rgba(39, 25, 68, .88);
+          box-shadow:
+            0 12px 28px #0005;
         }
 
         .eh-benefit-icon {
@@ -1557,7 +2036,9 @@ export default function Home() {
           border-radius: 12px;
           background: #8b5cf625;
           color: var(--lilac);
-          transition: transform .3s ease, background .3s ease;
+          transition:
+            transform .3s ease,
+            background .3s ease;
         }
 
         .eh-benefit:hover .eh-benefit-icon {
@@ -1578,8 +2059,10 @@ export default function Home() {
           line-height: 1.7;
         }
 
+        /* HOW TO */
         .eh-howto {
-          padding: clamp(22px, 3.5vw, 40px);
+          padding:
+            clamp(22px, 3.5vw, 40px);
           border: 1px solid var(--line);
           border-radius: 20px;
           background: var(--surface);
@@ -1592,7 +2075,8 @@ export default function Home() {
 
         .eh-steps {
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns:
+            repeat(3, minmax(0, 1fr));
           gap: 20px;
           margin: 0;
           padding: 0;
@@ -1606,22 +2090,33 @@ export default function Home() {
           padding: 23px;
           border: 1px solid var(--line);
           border-radius: 15px;
-          background: rgba(21,16,39,.72);
+          background:
+            rgba(21, 16, 39, .72);
           transition:
             transform .3s ease,
             border-color .3s ease,
             background .3s ease;
-          animation: ehStepEnter .65s ease both;
+          animation:
+            ehStepEnter .65s ease both;
         }
 
-        .eh-steps li:nth-child(1) { animation-delay: .08s; }
-        .eh-steps li:nth-child(2) { animation-delay: .2s; }
-        .eh-steps li:nth-child(3) { animation-delay: .32s; }
+        .eh-steps li:nth-child(1) {
+          animation-delay: .08s;
+        }
+
+        .eh-steps li:nth-child(2) {
+          animation-delay: .2s;
+        }
+
+        .eh-steps li:nth-child(3) {
+          animation-delay: .32s;
+        }
 
         .eh-steps li:hover {
           transform: translateY(-5px);
           border-color: #9b7bea;
-          background: rgba(39,25,68,.85);
+          background:
+            rgba(39, 25, 68, .85);
         }
 
         @keyframes ehStepEnter {
@@ -1629,6 +2124,7 @@ export default function Home() {
             opacity: 0;
             transform: translateY(12px);
           }
+
           to {
             opacity: 1;
             transform: translateY(0);
@@ -1644,7 +2140,8 @@ export default function Home() {
 
         .eh-step-number {
           color: #a78bfa;
-          font-family: var(--font-outfit), sans-serif;
+          font-family:
+            "Outfit", sans-serif;
           font-size: 36px;
           line-height: 1;
           font-weight: 800;
@@ -1661,7 +2158,9 @@ export default function Home() {
           border-radius: 12px;
           background: #8b5cf618;
           color: #c4b5fd;
-          transition: background .3s ease, border-color .3s ease;
+          transition:
+            background .3s ease,
+            border-color .3s ease;
         }
 
         .eh-steps li:hover .eh-step-icon {
@@ -1687,6 +2186,7 @@ export default function Home() {
           line-height: 1.75;
         }
 
+        /* GALLERY */
         .eh-gallery {
           position: relative;
           isolation: isolate;
@@ -1700,7 +2200,8 @@ export default function Home() {
           position: absolute;
           z-index: 0;
           inset: 0;
-          background-image: url("/images/bg galeri.jpg");
+          background-image:
+            url("/images/bg galeri.jpg");
           background-position: center;
           background-size: cover;
         }
@@ -1709,18 +2210,20 @@ export default function Home() {
           position: absolute;
           z-index: 1;
           inset: 0;
-          background: linear-gradient(
-            180deg,
-            rgba(10,7,22,.92),
-            rgba(10,7,22,.78) 45%,
-            rgba(10,7,22,.94)
-          );
+          background:
+            linear-gradient(
+              180deg,
+              rgba(10, 7, 22, .92),
+              rgba(10, 7, 22, .78) 45%,
+              rgba(10, 7, 22, .94)
+            );
         }
 
         .eh-gallery-head {
           position: relative;
           z-index: 2;
-          padding: 0 clamp(16px, 4vw, 40px);
+          padding:
+            0 clamp(16px, 4vw, 40px);
         }
 
         .eh-marquee-wrap {
@@ -1733,26 +2236,29 @@ export default function Home() {
 
         .eh-marquee {
           overflow: hidden;
-          -webkit-mask-image: linear-gradient(
-            90deg,
-            transparent,
-            #000 8%,
-            #000 92%,
-            transparent
-          );
-          mask-image: linear-gradient(
-            90deg,
-            transparent,
-            #000 8%,
-            #000 92%,
-            transparent
-          );
+          -webkit-mask-image:
+            linear-gradient(
+              90deg,
+              transparent,
+              #000 8%,
+              #000 92%,
+              transparent
+            );
+          mask-image:
+            linear-gradient(
+              90deg,
+              transparent,
+              #000 8%,
+              #000 92%,
+              transparent
+            );
         }
 
         .eh-marquee-track {
           display: flex;
           width: max-content;
-          animation: ehMarquee 50s linear infinite;
+          animation:
+            ehMarquee 50s linear infinite;
           will-change: transform;
         }
 
@@ -1795,10 +2301,16 @@ export default function Home() {
         }
 
         @keyframes ehMarquee {
-          from { transform: translateX(0); }
-          to { transform: translateX(-50%); }
+          from {
+            transform: translateX(0);
+          }
+
+          to {
+            transform: translateX(-50%);
+          }
         }
 
+        /* ENCORE EXPERIENCE */
         .eh-testimonial-wrapper {
           position: relative;
           padding: 0 48px;
@@ -1818,7 +2330,8 @@ export default function Home() {
         }
 
         .eh-testimonial {
-          flex: 0 0 calc((100% - 36px) / 3);
+          flex:
+            0 0 calc((100% - 36px) / 3);
           min-width: 0;
           min-height: 220px;
           display: flex;
@@ -1828,7 +2341,8 @@ export default function Home() {
           border: 1px solid var(--line);
           border-radius: 16px;
           background: var(--surface);
-          transition: border-color .3s ease;
+          transition:
+            border-color .3s ease;
         }
 
         .eh-testimonial:hover {
@@ -1917,7 +2431,8 @@ export default function Home() {
         .eh-review-arrow:hover {
           background: #8b5cf6;
           border-color: #a78bfa;
-          transform: translateY(-50%) scale(1.08);
+          transform:
+            translateY(-50%) scale(1.08);
         }
 
         .eh-review-left {
@@ -1928,6 +2443,7 @@ export default function Home() {
           right: 0;
         }
 
+        /* FAQ */
         .eh-faq-wrap {
           max-width: 860px;
           margin: 0 auto;
@@ -1939,7 +2455,8 @@ export default function Home() {
         }
 
         .eh-faq-head h2 {
-          font-size: clamp(22px, 2.4vw, 30px);
+          font-size:
+            clamp(22px, 2.4vw, 30px);
           font-weight: 800;
           letter-spacing: -.6px;
         }
@@ -1954,7 +2471,8 @@ export default function Home() {
           border: 1px solid var(--line);
           border-radius: 12px;
           background: var(--surface);
-          transition: border-color .2s;
+          transition:
+            border-color .2s;
         }
 
         .eh-faq-item[open] {
@@ -1998,9 +2516,11 @@ export default function Home() {
           line-height: 1.8;
         }
 
+        /* RESPONSIVE */
         @media (max-width: 700px) {
           .encore-home-2026 {
-            background-position: center center;
+            background-position:
+              center center;
             background-size: 100% auto;
             background-repeat: repeat-y;
           }
@@ -2066,7 +2586,8 @@ export default function Home() {
           }
 
           .eh-up-row {
-            grid-template-columns: 76px 1fr;
+            grid-template-columns:
+              76px 1fr;
             gap: 12px;
             padding: 10px;
           }
@@ -2077,14 +2598,17 @@ export default function Home() {
 
           .eh-up-action {
             grid-column: 1 / -1;
-            justify-content: space-between;
+            justify-content:
+              space-between;
             text-align: left;
             padding-top: 10px;
-            border-top: 1px dashed var(--line);
+            border-top:
+              1px dashed var(--line);
           }
 
           .eh-cities {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns:
+              repeat(2, minmax(0, 1fr));
           }
 
           .eh-city {
@@ -2116,7 +2640,9 @@ export default function Home() {
           }
         }
 
-        @media (prefers-reduced-motion: reduce) {
+        @media (
+          prefers-reduced-motion: reduce
+        ) {
           .eh-hero-photo,
           .eh-why-content,
           .eh-steps li {
@@ -2128,7 +2654,8 @@ export default function Home() {
           }
 
           .eh-testimonials-track {
-            transition-duration: 0.01ms !important;
+            transition-duration:
+              0.01ms !important;
           }
 
           .eh-steps li,
@@ -2156,7 +2683,9 @@ export default function Home() {
             animation: none;
           }
 
-          .eh-marquee-group[aria-hidden="true"] {
+          .eh-marquee-group[
+            aria-hidden="true"
+          ] {
             display: none;
           }
         }

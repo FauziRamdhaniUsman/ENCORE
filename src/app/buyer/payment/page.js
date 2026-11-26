@@ -832,6 +832,13 @@ export default function PaymentPage() {
               </div>
             )}
           </section>
+                  <button
+          type="button"
+          onClick={finalizeOrderInSupabase}
+          className="mt-2.5 flex min-h-[46px] w-full cursor-pointer items-center justify-center rounded-[10px] border border-[#4ade80]/50 bg-[#22c55e18] p-3 text-xs font-bold text-[#4ade80] transition hover:bg-[#22c55e30]"
+        >
+          ⚡ Simulasi Bayar Otomatis (Mode Testing)
+        </button>
 
           {/* KOLOM KANAN: RINGKASAN PESANAN */}
           <aside className="rounded-[17px] border border-[#49316d] bg-[#110c20f7] p-[27px] shadow-[0_12px_35px_#00000035] max-[800px]:p-[21px]">

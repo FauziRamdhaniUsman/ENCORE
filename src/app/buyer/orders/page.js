@@ -24,28 +24,17 @@ export default function BuyerOrdersPage() {
 
         // Ambil data orders milik buyer beserta relasi tickets, events, dan ticket_types
         const { data, error } = await supabase
-          .from("orders")
-          .select(
-            `
+        .from("orders")
+        .select(`
+          *,
+          tickets (
             *,
-            tickets (
-              id,
-              ticket_code,
-              events (
-                title,
-                date,
-                location,
-                venue,
-                image_url
-              ),
-              ticket_types (
-                name
-              )
-            )
-          `
+            events ( * ),
+            ticket_types ( * )
           )
-          .eq("buyer_id", user.id)
-          .order("created_at", { ascending: false });
+        `)
+        .eq("buyer_id", user.id)
+        .order("created_at", { ascending: false });
 
         if (error) {
           console.error("Gagal memuat transaksi dari Supabase:", error);

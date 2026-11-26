@@ -1,9 +1,9 @@
-
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { supabase } from "../lib/supabase";
 
 const menus = [
   { label: "Tiket Event", href: "/buyer/tickets", icon: "▣" },
@@ -36,50 +36,61 @@ export default function BuyerAccountLayout({ children }) {
   const [user, setUser] = useState(null);
   const [orders, setOrders] = useState([]);
 
-  useEffect(() => {
-    const loadAccount = () => {
-      try {
-        const savedUser = JSON.parse(
-          localStorage.getItem("encoreCurrentUser") || "null"
-        );
+  const loadAccount = useCallback(async () => {
+    try {
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
 
-        if (!savedUser || savedUser.role !== "buyer") {
-          router.replace("/login");
-          return;
-        }
-
-        setUser(savedUser);
-
-        const savedOrders = JSON.parse(
-          localStorage.getItem("encoreOrders") || "[]"
-        );
-
-        setOrders(
-          savedOrders.filter(
-            (order) =>
-              order.userId === savedUser.id ||
-              order.buyerEmail === savedUser.email
-          )
-        );
-      } catch (error) {
-        console.error("Gagal memuat akun:", error);
+      if (!authUser) {
         router.replace("/login");
+        return;
       }
-    };
 
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", authUser.id)
+        .single();
+
+      if (!profile || profile.role !== "buyer") {
+        router.replace("/login");
+        return;
+      }
+
+      setUser({
+        ...profile,
+        name: profile.full_name || profile.name || "Buyer ENCORE",
+        email: profile.email || authUser.email,
+        avatar: profile.avatar_url || profile.avatar || "",
+      });
+
+      const { data: ordersData, error } = await supabase
+        .from("orders")
+        .select("id, payment_status")
+        .eq("buyer_id", authUser.id);
+
+      if (!error && ordersData) {
+        setOrders(ordersData);
+      }
+    } catch (error) {
+      console.error("Gagal memuat akun:", error);
+      router.replace("/login");
+    }
+  }, [router]);
+
+  useEffect(() => {
     loadAccount();
 
     window.addEventListener("encore-profile-updated", loadAccount);
 
     return () => {
-      window.removeEventListener(
-        "encore-profile-updated",
-        loadAccount
-      );
+      window.removeEventListener("encore-profile-updated", loadAccount);
     };
-  }, [router]);
+  }, [loadAccount]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     localStorage.removeItem("encoreCurrentUser");
     localStorage.removeItem("encoreRememberEmail");
     router.push("/login");
@@ -97,25 +108,17 @@ export default function BuyerAccountLayout({ children }) {
 
   const successfulOrders = orders.filter((order) =>
     ["paid", "success", "settlement"].includes(
-      String(
-        order.status || order.paymentStatus || ""
-      ).toLowerCase()
+      String(order.payment_status || "").toLowerCase()
     )
   ).length;
 
   return (
     <main className="box-border min-h-screen bg-[#090611] px-[5%] py-[65px] text-white max-[600px]:px-[15px] max-[600px]:py-[25px]">
-
       <div className="mx-auto grid max-w-[1450px] grid-cols-[348px_minmax(0,1fr)] items-start gap-7 max-[950px]:grid-cols-1">
-
         {/* SIDEBAR PROFIL */}
-
         <aside className="flex flex-col gap-[22px]">
-
           <section className={`${card} px-5 py-[30px] text-center`}>
-
             <div className="mx-auto mb-4 grid size-[78px] place-items-center overflow-hidden rounded-full bg-[linear-gradient(135deg,#a66aff,#6334a0)] text-[28px] font-extrabold text-white">
-
               {user.avatar ? (
                 <img
                   src={user.avatar}
@@ -125,7 +128,6 @@ export default function BuyerAccountLayout({ children }) {
               ) : (
                 initial
               )}
-
             </div>
 
             <h2 className="mb-1 text-[21px] font-bold text-white [overflow-wrap:anywhere]">
@@ -150,13 +152,10 @@ export default function BuyerAccountLayout({ children }) {
             >
               ↪ Keluar
             </button>
-
           </section>
 
           {/* RINGKASAN AKUN */}
-
           <section className={`${card} p-[22px]`}>
-
             <h3 className="mb-[17px] text-[17px] font-bold">
               Ringkasan Akun
             </h3>
@@ -186,44 +185,32 @@ export default function BuyerAccountLayout({ children }) {
                 {successfulOrders}
               </strong>
             </div>
-
           </section>
-
         </aside>
 
         {/* KONTEN UTAMA */}
-
         <section className="min-w-0">
-
           {/* NAVIGASI TAB */}
-
           <nav className="mb-[22px] flex flex-wrap gap-[9px] max-[600px]:flex-nowrap max-[600px]:overflow-x-auto">
-
             {menus.map((item) => (
               <Link
                 href={item.href}
                 key={item.href}
                 className={`${tabBase} ${
-                  pathname === item.href
-                    ? tabActive
-                    : tabIdle
+                  pathname === item.href ? tabActive : tabIdle
                 }`}
               >
                 <span>{item.icon}</span>
                 {item.label}
               </Link>
             ))}
-
           </nav>
 
           {/* KARTU KONTEN */}
-
           <div className={`${card} min-h-[520px] p-[30px] max-[600px]:px-4 max-[600px]:py-[22px]`}>
             {children}
           </div>
-
         </section>
-
       </div>
     </main>
   );

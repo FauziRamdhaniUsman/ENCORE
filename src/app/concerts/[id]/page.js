@@ -3,7 +3,8 @@
 import { Suspense, use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { concerts, formatPrice } from "../../../data/concerts";
+import { formatPrice } from "../../../lib/format";
+import { formatEventDate } from "../../../lib/events";
 import { supabase } from "../../../lib/supabase";
 
 const pageBg =
@@ -134,18 +135,10 @@ function ConcertDetailContent({ params }) {
   const [eventsLoaded, setEventsLoaded] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchConcertDetail = async () => {
       try {
-        const staticConcert = concerts.find(
-          (item) => String(item.id) === String(id)
-        );
-
-        if (staticConcert) {
-          setConcert(staticConcert);
-          setEventsLoaded(true);
-          return;
-        }
-
         const { data: ev, error } = await supabase
           .from("events")
           .select(
@@ -166,24 +159,18 @@ function ConcertDetailContent({ params }) {
           .eq("id", id)
           .maybeSingle();
 
+        if (cancelled) return;
+
         if (error || !ev) {
+          if (error) console.error("Gagal membaca detail konser:", error);
           setConcert(null);
           return;
         }
 
-        const parsedDate = ev.event_date ? new Date(ev.event_date) : null;
-        const isValidDate = parsedDate && !Number.isNaN(parsedDate.getTime());
-
-        const formattedDate = isValidDate
-          ? parsedDate.toLocaleDateString("id-ID", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })
-          : ev.event_date || "-";
+        const { text: formattedDate } = formatEventDate(ev.event_date);
 
         const mappedTickets = Array.isArray(ev.ticket_types)
-          ? ev.ticket_types
+          ? [...ev.ticket_types]
               .sort((a, b) => Number(a.price || 0) - Number(b.price || 0))
               .map((t) => ({
                 id: t.id,
@@ -209,20 +196,19 @@ function ConcertDetailContent({ params }) {
 
         setConcert({
           id: ev.id,
-          isSupabase: true,
           title: ev.title,
           subtitle: ev.subtitle || ev.artist || "",
           artist: ev.artist || "ENCORE Artist",
           date: formattedDate,
-          location: ev.location || ev.venue || "Indonesia",
+          location: ev.location || ev.city || ev.venue || "Indonesia",
           venue: ev.venue || "",
           description: ev.description || "",
           image: ev.image_url || "/images/default-concert.jpg",
 
-          // Mengambil denah dari kolom seating_plan_url
+          // Denah dari kolom seating_plan_url
           seatingPlan: ev.seating_plan_url || "",
 
-          // Mengambil syarat dan ketentuan dari Organizer
+          // Syarat dan ketentuan dari organizer
           notes: ev.terms_and_conditions
             ? ev.terms_and_conditions
                 .split(/\r?\n/)
@@ -237,13 +223,17 @@ function ConcertDetailContent({ params }) {
         });
       } catch (error) {
         console.error("Gagal membaca detail konser:", error);
-        setConcert(null);
+        if (!cancelled) setConcert(null);
       } finally {
-        setEventsLoaded(true);
+        if (!cancelled) setEventsLoaded(true);
       }
     };
 
     fetchConcertDetail();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   if (!eventsLoaded) {
@@ -497,27 +487,18 @@ function ConcertDetailContent({ params }) {
 
           {concert.seatingPlan && (
             <section className={panel}>
-              <h2 className={panelTitle}>
-                {concert.id === 6
-                  ? "Informasi Harga Tiket"
-                  : "Denah Tempat Duduk"}
-              </h2>
+              <h2 className={panelTitle}>Denah Tempat Duduk</h2>
 
               <p className={muted}>
-                {concert.id === 6
-                  ? "Lihat daftar harga tiket Regular dan VIP untuk Day 1 dan Day 2."
-                  : "Lihat posisi panggung dan kategori tiket sebelum menentukan tempat dudukmu."}
+                Lihat posisi panggung dan kategori tiket sebelum menentukan
+                tempat dudukmu.
               </p>
 
               <div className="mt-[25px] w-full overflow-hidden rounded-2xl border border-[#49316d] bg-[#100b20] p-3.5 max-[700px]:p-[7px]">
                 {!imageError ? (
                   <img
                     src={concert.seatingPlan}
-                    alt={
-                      concert.id === 6
-                        ? `Informasi harga tiket ${concert.title}`
-                        : `Seating plan ${concert.title}`
-                    }
+                    alt={`Seating plan ${concert.title}`}
                     onError={() => setImageError(true)}
                     className="block h-auto w-full rounded-[10px] object-contain"
                   />
@@ -528,20 +509,19 @@ function ConcertDetailContent({ params }) {
                     </span>
 
                     <h3 className="font-heading text-[23px] font-bold text-white">
-                      {concert.id === 6 ? "Informasi Tiket" : "Seating Plan"}
+                      Seating Plan
                     </h3>
 
                     <p className="text-sm leading-[1.7] text-[#b9aed0]">
-                      Gambar informasi tiket akan ditampilkan di sini.
+                      Gambar denah akan ditampilkan di sini.
                     </p>
                   </div>
                 )}
               </div>
 
               <p className={demoNote}>
-                {concert.id === 6
-                  ? "* Harga mengikuti informasi pada poster penyelenggara dan belum termasuk pajak serta admin fee."
-                  : "* Denah merupakan ilustrasi area kategori tiket. Tata letak aktual mengikuti penyelenggara."}
+                * Denah merupakan ilustrasi area kategori tiket. Tata letak
+                aktual mengikuti penyelenggara.
               </p>
             </section>
           )}
@@ -805,28 +785,15 @@ function ConcertDetailContent({ params }) {
           </div>
 
           <div className={summaryRow}>
-            <span className="text-[#b9aed0]">
-              {activeTicket.persons ? "Harga per Paket" : "Harga per Tiket"}
-            </span>
+            <span className="text-[#b9aed0]">Harga per Tiket</span>
 
             <strong className={summaryValue}>
               {formatPrice(activeTicket.price)}
             </strong>
           </div>
 
-          {activeTicket.persons && (
-            <div className={summaryRow}>
-              <span className="text-[#b9aed0]">Peserta per Paket</span>
-              <strong className={summaryValue}>
-                {activeTicket.persons} orang
-              </strong>
-            </div>
-          )}
-
           <div className="flex items-center justify-between gap-3 border-t border-[#49316d] py-5 text-sm">
-            <span>
-              {activeTicket.persons ? "Jumlah Paket" : "Jumlah Tiket"}
-            </span>
+            <span>Jumlah Tiket</span>
 
             <div className="flex items-center gap-[17px]">
               <button
@@ -854,15 +821,6 @@ function ConcertDetailContent({ params }) {
               </button>
             </div>
           </div>
-
-          {activeTicket.persons && (
-            <div className={summaryRow}>
-              <span className="text-[#b9aed0]">Total Peserta</span>
-              <strong className={summaryValue}>
-                {activeTicket.persons * quantity} orang
-              </strong>
-            </div>
-          )}
 
           <div className="flex items-center justify-between gap-[15px] border-t border-[#49316d] py-[22px]">
             <span className="text-sm text-[#b9aed0]">Subtotal</span>

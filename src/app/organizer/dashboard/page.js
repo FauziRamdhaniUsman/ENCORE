@@ -257,6 +257,13 @@ export default function OrganizerDashboard() {
           >
             Manajemen Petugas
           </Link>
+
+          <Link
+            href="/organizer/checkin"
+            className="inline-block rounded-[10px] bg-[#a766e8] px-5 py-[13px] text-[13px] font-bold text-white transition hover:brightness-110"
+          >
+          Scan Tiket
+           </Link>
         </div>
       </header>
 

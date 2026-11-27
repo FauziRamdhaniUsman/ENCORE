@@ -13,7 +13,7 @@
     "@tailwindcss/postcss": "^4.3.5",
     "html5-qrcode": "^2.3.8",
     "midtrans-client": "^1.4.3",
-    "next": "16.4.4",
+    "next": "^16.4.6",
     "postcss": "^8.5.32",
     "qrcode.react": "^4.2.0",
     "react": "19.3.0",

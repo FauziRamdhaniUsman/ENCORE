@@ -1,12 +1,8 @@
-
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  concerts as staticConcerts,
-  formatPrice,
-} from "../data/concerts";
+import { formatPrice } from "../lib/format";
 import { supabase } from "../lib/supabase";
 
 const imageExtensions = ["jpg", "jpeg", "png", "webp"];
@@ -484,8 +480,7 @@ export default function Home() {
             ? result.data
             : [];
 
-        const source =
-          rows.length > 0 ? rows : staticConcerts;
+        const source = rows;
 
         const list = source
           .filter(
@@ -1286,17 +1281,26 @@ export default function Home() {
           width: 100%;
           min-height: 100vh;
           background-color: var(--bg);
+          color: #ffffff;
+          overflow: hidden;
+        }
+
+        /* BACKGROUND HOME: satu gambar penuh, diam, tidak diulang */
+        .encore-home-2026::before {
+          content: "";
+          position: fixed;
+          inset: 0;
+          z-index: -1;
+          pointer-events: none;
           background-image:
             linear-gradient(
               rgba(10, 7, 22, .35),
               rgba(10, 7, 22, .55)
             ),
-            url("/images/bg%20home.jpg");
-          background-position: center center;
-          background-size: 100% auto;
-          background-repeat: repeat-y;
-          color: #ffffff;
-          overflow: hidden;
+            url("/images/bg-home-v2.jpg");
+          background-position: center;
+          background-size: cover;
+          background-repeat: no-repeat;
         }
 
         .encore-home-2026 * {
@@ -2518,13 +2522,6 @@ export default function Home() {
 
         /* RESPONSIVE */
         @media (max-width: 700px) {
-          .encore-home-2026 {
-            background-position:
-              center center;
-            background-size: 100% auto;
-            background-repeat: repeat-y;
-          }
-
           .eh-hero {
             height: 44svh;
             min-height: 240px;

@@ -2,7 +2,7 @@ import { supabase } from "./supabase";
 
 // Nilai kolom events.status yang boleh tampil ke publik.
 // Kalau tabelmu tidak punya kolom status, semua event tampil.
-const PUBLISHED_STATUS = "published";
+const HIDDEN_STATUSES = ["draft", "pending", "rejected", "cancelled", "archived"];
 
 const TIMEZONE = "Asia/Jakarta";
 
@@ -69,7 +69,8 @@ export async function fetchPublishedEvents() {
   if (error) throw error;
 
   return (data || [])
-    .filter((ev) => !ev.status || ev.status === PUBLISHED_STATUS)
-    .filter((ev) => Array.isArray(ev.ticket_types) && ev.ticket_types.length > 0)
+    .filter(
+      (ev) => !HIDDEN_STATUSES.includes(String(ev.status || "").toLowerCase())
+    )
     .map(mapEvent);
 }
